@@ -8,6 +8,14 @@ import { createForgeStore } from '../../../../lib/store/forge-store.ts'
 
 function makeStore() {
   let counter = 0
+  const store = createForgeStore({ newId: () => `id-${++counter}` })
+  store.getState().setNewTableId('none')
+  return store
+}
+
+/** A store left on the default settings, to see what a new table starts with. */
+function makeDefaultStore() {
+  let counter = 0
   return createForgeStore({ newId: () => `id-${++counter}` })
 }
 
@@ -384,5 +392,89 @@ describe('relationship selection', () => {
     store.getState().selectRelationship('x')
     store.getState().hydrate({ status: 'empty' })
     assert.equal(store.getState().relationshipSelection, null)
+  })
+})
+
+describe('the id column of a new table', () => {
+  it('starts with the default settings', () => {
+    assert.deepEqual(makeDefaultStore().getState().settings, {
+      newTableId: 'integer',
+    })
+  })
+
+  it('creates a generated integer id as the primary key by default', () => {
+    const store = makeDefaultStore()
+    const tableId = store.getState().addTable()
+    const table = store.getState().schema.tables[0]
+    assert.equal(table?.id, tableId)
+    assert.deepEqual(table?.columns, [
+      {
+        id: table?.columns[0]?.id,
+        name: 'id',
+        type: { kind: 'integer' },
+        nullable: false,
+        generated: true,
+      },
+    ])
+    assert.deepEqual(table?.primaryKey, [table?.columns[0]?.id])
+    assert.equal(store.getState().selection, tableId)
+  })
+
+  it('creates a generated uuid id when the preference is uuid', () => {
+    const store = makeDefaultStore()
+    store.getState().setNewTableId('uuid')
+    store.getState().addTable()
+    const column = store.getState().schema.tables[0]?.columns[0]
+    assert.deepEqual(column?.type, { kind: 'uuid' })
+    assert.equal(column?.generated, true)
+    assert.equal(column?.nullable, false)
+  })
+
+  it('creates an empty table when the preference is none, as before', () => {
+    const store = makeDefaultStore()
+    store.getState().setNewTableId('none')
+    store.getState().addTable()
+    assert.deepEqual(store.getState().schema.tables[0]?.columns, [])
+    assert.deepEqual(store.getState().schema.tables[0]?.primaryKey, [])
+  })
+
+  it('changing the preference only affects the tables created afterwards', () => {
+    const store = makeDefaultStore()
+    store.getState().addTable()
+    store.getState().setNewTableId('none')
+    store.getState().addTable()
+    assert.equal(store.getState().schema.tables[0]?.columns.length, 1)
+    assert.equal(store.getState().schema.tables[1]?.columns.length, 0)
+  })
+
+  it('gives every table its own column id', () => {
+    const store = makeDefaultStore()
+    store.getState().addTable()
+    store.getState().addTable()
+    const [first, second] = store.getState().schema.tables
+    assert.notEqual(first?.columns[0]?.id, second?.columns[0]?.id)
+  })
+
+  it('names the first column the user adds column_1 even though id exists', () => {
+    const store = makeDefaultStore()
+    const tableId = store.getState().addTable()
+    store.getState().addColumn(tableId)
+    assert.deepEqual(
+      store.getState().schema.tables[0]?.columns.map((column) => column.name),
+      ['id', 'column_1']
+    )
+  })
+
+  it('hydrateSettings replaces the settings', () => {
+    const store = makeDefaultStore()
+    store.getState().hydrateSettings({ newTableId: 'uuid' })
+    assert.deepEqual(store.getState().settings, { newTableId: 'uuid' })
+  })
+
+  it('startNewProject keeps the settings: they belong to the app, not the project', () => {
+    const store = makeDefaultStore()
+    store.getState().setNewTableId('uuid')
+    store.getState().startNewProject()
+    assert.equal(store.getState().settings.newTableId, 'uuid')
   })
 })

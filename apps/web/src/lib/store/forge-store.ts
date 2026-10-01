@@ -14,6 +14,8 @@ import { createStore } from 'zustand/vanilla'
 import type { LoadResult } from '../../queries/project/load-project.ts'
 import type { NodePosition, ProjectView, Viewport } from '../project-view.ts'
 import { createView, nextNodePosition, parseView } from '../project-view.ts'
+import type { AppSettings, NewTableId } from '../settings/settings.ts'
+import { DEFAULT_SETTINGS } from '../settings/settings.ts'
 
 /** `blocked` means the stored project could not be read: do not overwrite it. */
 export type PersistenceMode = 'ready' | 'blocked'
@@ -28,11 +30,15 @@ export interface ForgeState {
   selection: TableId | null
   /** At most one of `selection` and `relationshipSelection` is set. */
   relationshipSelection: RelationshipId | null
+  /** App preferences: they outlive any one project. */
+  settings: AppSettings
   hydrated: boolean
   persistence: PersistenceMode
   notice: StartupNotice | null
 
   hydrate: (result: LoadResult) => void
+  hydrateSettings: (settings: AppSettings) => void
+  setNewTableId: (newTableId: NewTableId) => void
   startNewProject: () => void
 
   addTable: () => TableId
@@ -74,6 +80,13 @@ const emptyProject = () => ({
 const stillSelected = (schema: Schema, id: RelationshipId | null) =>
   id !== null && schema.relationships.some((r) => r.id === id) ? id : null
 
+/** The smallest unused `prefix_N`, counting from 1. */
+function firstFreeName(prefix: string, taken: string[]): string {
+  let attempt = 1
+  while (taken.includes(`${prefix}_${attempt}`)) attempt++
+  return `${prefix}_${attempt}`
+}
+
 function nextName(prefix: string, taken: string[]): string {
   let attempt = taken.length + 1
   while (taken.includes(`${prefix}_${attempt}`)) attempt++
@@ -83,9 +96,15 @@ function nextName(prefix: string, taken: string[]): string {
 export function createForgeStore({ newId }: ForgeStoreDeps) {
   return createStore<ForgeState>()((set, get) => ({
     ...emptyProject(),
+    settings: DEFAULT_SETTINGS,
     hydrated: false,
     persistence: 'ready',
     notice: null,
+
+    hydrateSettings: (settings) => set({ settings }),
+
+    setNewTableId: (newTableId) =>
+      set({ settings: { ...get().settings, newTableId } }),
 
     hydrate: (result) => {
       switch (result.status) {
@@ -131,14 +150,26 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
       set({ ...emptyProject(), persistence: 'ready', notice: null }),
 
     addTable: () => {
-      const { schema, view } = get()
+      const { schema, view, settings } = get()
       const id = newId()
       const name = nextName(
         'table',
         schema.tables.map((table) => table.name)
       )
+      let next = core.addTable(schema, { id, name })
+      if (settings.newTableId !== 'none') {
+        const columnId = newId()
+        next = core.addColumn(next, id, {
+          id: columnId,
+          name: 'id',
+          type: { kind: settings.newTableId },
+          nullable: false,
+          generated: true,
+        })
+        next = core.setPrimaryKey(next, id, [columnId])
+      }
       set({
-        schema: core.addTable(schema, { id, name }),
+        schema: next,
         view: {
           ...view,
           nodes: {
@@ -173,7 +204,7 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
       const id = newId()
       const column: Column = {
         id,
-        name: nextName(
+        name: firstFreeName(
           'column',
           table.columns.map((existing) => existing.name)
         ),
