@@ -10,7 +10,7 @@ The semantic database model: tables, columns, types, keys, relationships, dialec
 
 - Glossary: `packages/core/GLOSSARY.md`
 - ADRs: `packages/core/docs/adr/`
-- Not created yet. `/domain-modeling` writes them when terms actually get resolved.
+- Created with slice 1; extend them as terms get resolved.
 
 ### `apps/web` — the canvas and UI
 
@@ -18,7 +18,7 @@ The visual projection of the domain model: node positions, viewport, selection, 
 
 - Glossary: `apps/web/GLOSSARY.md`
 - ADRs: `apps/web/docs/adr/`
-- Not created yet. `/domain-modeling` writes them when terms actually get resolved.
+- Created with slice 1; extend them as terms get resolved.
 
 ## System-wide decisions
 
