@@ -46,4 +46,12 @@ describe('createLocalStorageAdapter', () => {
     assert.throws(() => adapter.read(), /SecurityError/)
     assert.throws(() => adapter.write('x'), /SecurityError/)
   })
+
+  it('uses the key it is given, and forge:project by default', () => {
+    const { data, storage } = fakeStorage()
+    createLocalStorageAdapter(() => storage, 'forge:settings').write('{"a":1}')
+    createLocalStorageAdapter(() => storage).write('{"b":2}')
+    assert.equal(data.get('forge:settings'), '{"a":1}')
+    assert.equal(data.get('forge:project'), '{"b":2}')
+  })
 })

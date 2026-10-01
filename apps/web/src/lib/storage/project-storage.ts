@@ -1,4 +1,5 @@
 export const PROJECT_STORAGE_KEY = 'forge:project'
+export const SETTINGS_STORAGE_KEY = 'forge:settings'
 
 /** Where the serialized project lives. Both methods may throw. */
 export interface ProjectStorage {

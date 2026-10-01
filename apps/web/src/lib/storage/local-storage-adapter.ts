@@ -7,10 +7,11 @@ import { PROJECT_STORAGE_KEY } from './project-storage.ts'
  * where `loadProject`/`saveProject` catch it, not while the app starts.
  */
 export function createLocalStorageAdapter(
-  getStorage: () => StorageLike
+  getStorage: () => StorageLike,
+  key: string = PROJECT_STORAGE_KEY
 ): ProjectStorage {
   return {
-    read: () => getStorage().getItem(PROJECT_STORAGE_KEY),
-    write: (value) => getStorage().setItem(PROJECT_STORAGE_KEY, value),
+    read: () => getStorage().getItem(key),
+    write: (value) => getStorage().setItem(key, value),
   }
 }
