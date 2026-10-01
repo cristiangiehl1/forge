@@ -10,6 +10,7 @@ import {
   setVarcharLength,
 } from '../../lib/column-types.ts'
 import { nextPrimaryKey } from '../../lib/primary-key.ts'
+import { relationshipsOf } from '../../lib/relationships.ts'
 
 function ColumnRow({ table, column }: { table: Table; column: Column }) {
   const { updateColumn, removeColumn, setPrimaryKey } = forgeStore.getState()
@@ -123,7 +124,9 @@ export function Inspector() {
   const table = useForgeStore((state) =>
     state.schema.tables.find((candidate) => candidate.id === state.selection)
   )
-  const { renameTable, removeTable, addColumn } = forgeStore.getState()
+  const schema = useForgeStore((state) => state.schema)
+  const { renameTable, removeTable, addColumn, removeRelationship } =
+    forgeStore.getState()
 
   if (!table) {
     return (
@@ -150,6 +153,26 @@ export function Inspector() {
           <ColumnRow key={column.id} table={table} column={column} />
         ))}
       </ul>
+      <h2 className='inspector__heading'>Relationships</h2>
+      {relationshipsOf(schema, table.id).length === 0 ? (
+        <p className='inspector__hint'>
+          Drag from a column handle to another column to relate them.
+        </p>
+      ) : (
+        <ul className='column-list'>
+          {relationshipsOf(schema, table.id).map((relationship) => (
+            <li key={relationship.id} className='column-row'>
+              <span className='relationship-label'>{relationship.label}</span>
+              <button
+                type='button'
+                aria-label={`Remove relationship ${relationship.label}`}
+                onClick={() => removeRelationship(relationship.id)}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       <div className='inspector__actions'>
         <button type='button' onClick={() => addColumn(table.id)}>
           Add column

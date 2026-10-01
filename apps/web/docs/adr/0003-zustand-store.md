@@ -1,6 +1,6 @@
 # Zustand for the web app's state
 
-`apps/web` keeps its state in a Zustand store. The store holds the `@forge/core` model plus the visual projection of it (node positions, viewport, selection), and React Flow reads and writes through it, with `applyNodeChanges` and `applyEdgeChanges` feeding its `onNodesChange` and `onEdgesChange`. This is the central-store approach React Flow's documentation recommends once an app grows, and its own examples use Zustand.
+`apps/web` keeps its state in a Zustand store. The store holds the `@forge/core` model plus the visual projection of it (node positions, viewport, selection), and React Flow reads and writes through it. The canvas is controlled: React Flow only reports the changes it wants (`onNodesChange`, `onEdgesChange`) and the app forwards the ones it owns to store actions, in `lib/canvas/forward-changes.ts`. Only node moves, node selection and edge removals are forwarded; a node removal never is, and React Flow's keyboard deletion is turned off (`deleteKeyCode={null}`), because with a table selected it would delete every relationship touching it. Tables and relationships are removed from the inspector. This is the central-store approach React Flow's documentation recommends once an app grows, and its own examples use Zustand.
 
 ## Consequences
 

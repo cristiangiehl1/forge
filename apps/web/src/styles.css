@@ -236,3 +236,9 @@ button {
   font-family: ui-monospace, monospace;
   font-size: 11px;
 }
+
+.relationship-label {
+  flex: 1;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
