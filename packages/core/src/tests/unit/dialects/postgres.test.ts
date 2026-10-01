@@ -75,3 +75,15 @@ describe('postgres.generatedClause', () => {
     assert.equal(postgres.generatedClause({ kind: 'varchar', length: 5 }), null)
   })
 })
+
+describe('postgres.generatedImpliesNotNull', () => {
+  it('is true for the identity types: PostgreSQL makes them NOT NULL', () => {
+    assert.equal(postgres.generatedImpliesNotNull({ kind: 'integer' }), true)
+    assert.equal(postgres.generatedImpliesNotNull({ kind: 'bigint' }), true)
+  })
+
+  it('is false for a uuid default and for types that cannot be generated', () => {
+    assert.equal(postgres.generatedImpliesNotNull({ kind: 'uuid' }), false)
+    assert.equal(postgres.generatedImpliesNotNull({ kind: 'text' }), false)
+  })
+})

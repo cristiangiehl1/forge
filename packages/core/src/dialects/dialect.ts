@@ -7,5 +7,7 @@ export interface Dialect {
   typeName(type: ColumnType): string
   /** The clause that makes the database generate the column's value, if it can. */
   generatedClause(type: ColumnType): string | null
+  /** Whether a generated column of this type is implicitly NOT NULL in the database. */
+  generatedImpliesNotNull(type: ColumnType): boolean
   quoteIdentifier(name: string): string
 }

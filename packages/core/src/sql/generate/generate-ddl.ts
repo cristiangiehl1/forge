@@ -25,7 +25,13 @@ function requireColumn(table: Table, columnId: string): Column {
 function createTable(table: Table, dialect: Dialect): string {
   const quote = (name: string) => dialect.quoteIdentifier(name)
   const lines = table.columns.map((column) => {
-    const required = !column.nullable || table.primaryKey.includes(column.id)
+    // The script must say what the database will do: an identity column is
+    // NOT NULL whether or not the model says so.
+    const required =
+      !column.nullable ||
+      table.primaryKey.includes(column.id) ||
+      (column.generated === true &&
+        dialect.generatedImpliesNotNull(column.type))
     const generated = column.generated
       ? dialect.generatedClause(column.type)
       : null

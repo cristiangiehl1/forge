@@ -1,5 +1,5 @@
 import type { Column, ColumnType } from '@forge/core'
-import { GENERATED_COLUMN_KINDS } from '@forge/core'
+import { GENERATED_COLUMN_KINDS, postgres } from '@forge/core'
 
 import type { ColumnKind } from './column-types.ts'
 import { defaultColumnType } from './column-types.ts'
@@ -22,4 +22,11 @@ export function typeChangePatch(
   return column.generated && !supportsGenerated(type)
     ? { type, generated: false }
     : { type }
+}
+
+/** A generated identity column is NOT NULL in the database whatever the model says. */
+export function impliesNotNull(column: Column): boolean {
+  return (
+    column.generated === true && postgres.generatedImpliesNotNull(column.type)
+  )
 }

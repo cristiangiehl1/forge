@@ -3,7 +3,11 @@ import { describe, it } from 'node:test'
 
 import type { Column, ColumnType } from '@forge/core'
 
-import { supportsGenerated, typeChangePatch } from '../../../lib/generated.ts'
+import {
+  impliesNotNull,
+  supportsGenerated,
+  typeChangePatch,
+} from '../../../lib/generated.ts'
 
 const column = (type: ColumnType, generated?: boolean): Column => ({
   id: 'c',
@@ -65,5 +69,22 @@ describe('typeChangePatch', () => {
         type: { kind: 'text' },
       }
     )
+  })
+})
+
+describe('impliesNotNull', () => {
+  it('is true for a generated integer or bigint: PostgreSQL makes identity NOT NULL', () => {
+    assert.equal(impliesNotNull(column({ kind: 'integer' }, true)), true)
+    assert.equal(impliesNotNull(column({ kind: 'bigint' }, true)), true)
+  })
+
+  it('is false for a generated uuid, and for any column that is not generated', () => {
+    assert.equal(impliesNotNull(column({ kind: 'uuid' }, true)), false)
+    assert.equal(impliesNotNull(column({ kind: 'integer' })), false)
+    assert.equal(impliesNotNull(column({ kind: 'integer' }, false)), false)
+  })
+
+  it('is false for a generated column of a type that cannot be generated', () => {
+    assert.equal(impliesNotNull(column({ kind: 'text' }, true)), false)
   })
 })

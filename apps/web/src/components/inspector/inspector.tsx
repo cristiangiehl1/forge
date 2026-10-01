@@ -8,13 +8,18 @@ import {
   setNumericScale,
   setVarcharLength,
 } from '../../lib/column-types.ts'
-import { supportsGenerated, typeChangePatch } from '../../lib/generated.ts'
+import {
+  impliesNotNull,
+  supportsGenerated,
+  typeChangePatch,
+} from '../../lib/generated.ts'
 import { nextPrimaryKey } from '../../lib/primary-key.ts'
 import { relationshipsOf } from '../../lib/relationships.ts'
 
 function ColumnRow({ table, column }: { table: Table; column: Column }) {
   const { updateColumn, removeColumn, setPrimaryKey } = forgeStore.getState()
   const isPrimaryKey = table.primaryKey.includes(column.id)
+  const notNullIsForced = isPrimaryKey || impliesNotNull(column)
 
   return (
     <li className='column-row'>
@@ -102,8 +107,8 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
       <label>
         <input
           type='checkbox'
-          checked={!column.nullable || isPrimaryKey}
-          disabled={isPrimaryKey}
+          checked={!column.nullable || notNullIsForced}
+          disabled={notNullIsForced}
           onChange={(event) =>
             updateColumn(table.id, column.id, {
               nullable: !event.target.checked,

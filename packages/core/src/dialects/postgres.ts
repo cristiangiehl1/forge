@@ -43,10 +43,16 @@ function generatedClause(type: ColumnType): string | null {
   }
 }
 
+// An identity column is always NOT NULL in PostgreSQL; a uuid default is not.
+function generatedImpliesNotNull(type: ColumnType): boolean {
+  return type.kind === 'integer' || type.kind === 'bigint'
+}
+
 export const postgres: Dialect = {
   id: 'postgres',
   maxIdentifierBytes: 63,
   typeName,
   generatedClause,
+  generatedImpliesNotNull,
   quoteIdentifier,
 }
