@@ -15,7 +15,11 @@
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
     "format:check": "biome format .",
-    "lint:ci": "biome ci ."
+    "lint:ci": "biome ci .",
+    "e2e": "pnpm --filter @forge/e2e run e2e",
+    "e2e:ui": "pnpm --filter @forge/e2e run e2e:ui",
+    "e2e:tour": "pnpm --filter @forge/e2e run e2e:tour",
+    "e2e:report": "pnpm --filter @forge/e2e run e2e:report"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.15",

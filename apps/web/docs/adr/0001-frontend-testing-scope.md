@@ -1,5 +1,7 @@
 # `apps/web` tests: unit and integration only, centralized in `src/tests/`, on node:test
 
+> Amended by ADR-0005: end-to-end tests with Playwright now exist, in their own package (`apps/e2e`). Everything below still holds for the tests inside `apps/web`.
+
 `apps/web` has automated tests, limited to two kinds: **unit** tests (one isolated, pure piece of code) and **integration** tests (several non-visual pieces working together, such as a `queries/` hook over the `lib/storage/` adapter). There are no component-rendering tests and no end-to-end tests. Tests are centralized under `src/tests/{unit,integration}`, following the folder-structure standard's test layout, and run with Node's native runner (`node:test` + `node:assert`, via `node --test`). Vitest, Jest, Testing Library, and Playwright are not used.
 
 This deliberately departs from the standard's frontend rule (colocated `<file>.test.ts`): the web app uses the same centralized layout the standard prescribes for backends.
