@@ -1,4 +1,4 @@
-import type { ColumnRef, ColumnSpec, Editor } from './editor.ts'
+import type { ColumnRef, ColumnSpec, Editor, NewTableId } from './editor.ts'
 
 /**
  * A small online shop: six tables, six foreign keys. Tables are placed by the
@@ -9,29 +9,29 @@ import type { ColumnRef, ColumnSpec, Editor } from './editor.ts'
  */
 export interface TableSpec {
   name: string
+  /** What the "New tables start with" preference is set to when the table is created. */
+  newTableId: NewTableId
   columns: ColumnSpec[]
 }
 
 export const SHOP_TABLES: TableSpec[] = [
   {
     name: 'users',
+    newTableId: 'uuid',
     columns: [
-      { name: 'id', type: 'uuid', primaryKey: true },
       { name: 'name', type: 'varchar', length: 120, notNull: true },
       { name: 'email', type: 'varchar', length: 255, notNull: true },
     ],
   },
   {
     name: 'categories',
-    columns: [
-      { name: 'id', type: 'uuid', primaryKey: true },
-      { name: 'name', type: 'varchar', length: 80, notNull: true },
-    ],
+    newTableId: 'uuid',
+    columns: [{ name: 'name', type: 'varchar', length: 80, notNull: true }],
   },
   {
     name: 'products',
+    newTableId: 'uuid',
     columns: [
-      { name: 'id', type: 'uuid', primaryKey: true },
       { name: 'category_id', type: 'uuid' },
       { name: 'name', type: 'varchar', length: 160, notNull: true },
       { name: 'price', type: 'numeric', notNull: true },
@@ -39,8 +39,8 @@ export const SHOP_TABLES: TableSpec[] = [
   },
   {
     name: 'orders',
+    newTableId: 'uuid',
     columns: [
-      { name: 'id', type: 'uuid', primaryKey: true },
       { name: 'user_id', type: 'uuid', notNull: true },
       { name: 'created_at', type: 'timestamp', notNull: true },
       { name: 'total', type: 'numeric', precision: 12, scale: 2 },
@@ -48,6 +48,7 @@ export const SHOP_TABLES: TableSpec[] = [
   },
   {
     name: 'order_items',
+    newTableId: 'none',
     columns: [
       { name: 'order_id', type: 'uuid', primaryKey: true },
       { name: 'product_id', type: 'uuid', primaryKey: true },
@@ -56,8 +57,8 @@ export const SHOP_TABLES: TableSpec[] = [
   },
   {
     name: 'reviews',
+    newTableId: 'uuid',
     columns: [
-      { name: 'id', type: 'uuid', primaryKey: true },
       { name: 'product_id', type: 'uuid', notNull: true },
       { name: 'user_id', type: 'uuid', notNull: true },
       { name: 'rating', type: 'integer', notNull: true },
@@ -91,7 +92,14 @@ export const SHOP_FOREIGN_KEYS: ForeignKey[] = [
 ]
 
 export async function buildShopTables(editor: Editor) {
+  let current: NewTableId | undefined
   for (const table of SHOP_TABLES) {
+    // Tables with a generated uuid id get it from the preference; order_items
+    // has a composite key of its own, so it is created with no id column.
+    if (table.newTableId !== current) {
+      await editor.chooseNewTableId(table.newTableId)
+      current = table.newTableId
+    }
     await editor.defineTable(table.name, table.columns)
   }
 }
@@ -111,7 +119,7 @@ export async function buildShop(editor: Editor) {
 export const SHOP_DDL = [
   [
     'CREATE TABLE "users" (',
-    '  "id" uuid NOT NULL,',
+    '  "id" uuid NOT NULL DEFAULT gen_random_uuid(),',
     '  "name" varchar(120) NOT NULL,',
     '  "email" varchar(255) NOT NULL,',
     '  PRIMARY KEY ("id")',
@@ -119,14 +127,14 @@ export const SHOP_DDL = [
   ],
   [
     'CREATE TABLE "categories" (',
-    '  "id" uuid NOT NULL,',
+    '  "id" uuid NOT NULL DEFAULT gen_random_uuid(),',
     '  "name" varchar(80) NOT NULL,',
     '  PRIMARY KEY ("id")',
     ');',
   ],
   [
     'CREATE TABLE "products" (',
-    '  "id" uuid NOT NULL,',
+    '  "id" uuid NOT NULL DEFAULT gen_random_uuid(),',
     '  "category_id" uuid,',
     '  "name" varchar(160) NOT NULL,',
     '  "price" numeric(10,2) NOT NULL,',
@@ -135,7 +143,7 @@ export const SHOP_DDL = [
   ],
   [
     'CREATE TABLE "orders" (',
-    '  "id" uuid NOT NULL,',
+    '  "id" uuid NOT NULL DEFAULT gen_random_uuid(),',
     '  "user_id" uuid NOT NULL,',
     '  "created_at" timestamptz NOT NULL,',
     '  "total" numeric(12,2),',
@@ -152,7 +160,7 @@ export const SHOP_DDL = [
   ],
   [
     'CREATE TABLE "reviews" (',
-    '  "id" uuid NOT NULL,',
+    '  "id" uuid NOT NULL DEFAULT gen_random_uuid(),',
     '  "product_id" uuid NOT NULL,',
     '  "user_id" uuid NOT NULL,',
     '  "rating" integer NOT NULL,',

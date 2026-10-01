@@ -13,6 +13,8 @@ export type ColumnKind =
   | 'varchar'
   | 'numeric'
 
+export type NewTableId = 'integer' | 'uuid' | 'none'
+
 export interface ColumnSpec {
   name: string
   type?: ColumnKind
@@ -21,6 +23,7 @@ export interface ColumnSpec {
   scale?: number
   primaryKey?: boolean
   notNull?: boolean
+  generated?: boolean
 }
 
 export interface ColumnRef {
@@ -39,11 +42,40 @@ export class Editor {
     this.page = page
   }
 
-  async open() {
+  /**
+   * Opens the editor. Tests that build their own columns want new tables to
+   * start empty, so the "New tables start with" preference is seeded to
+   * `none`; pass `'app-default'` to leave it as a first-time user sees it.
+   */
+  async open(options: { newTableId?: NewTableId | 'app-default' } = {}) {
+    const choice = options.newTableId ?? 'none'
+    if (choice !== 'app-default') {
+      await this.page.addInitScript((value) => {
+        try {
+          if (!localStorage.getItem('e2e:settings-seeded')) {
+            localStorage.setItem('e2e:settings-seeded', '1')
+            localStorage.setItem(
+              'forge:settings',
+              JSON.stringify({ newTableId: value })
+            )
+          }
+        } catch {
+          // storage may be blocked on purpose by the test
+        }
+      }, choice)
+    }
     await this.page.goto('/')
     await expect(
       this.page.getByRole('button', { name: 'New table' })
     ).toBeVisible()
+  }
+
+  newTableIdSelect(): Locator {
+    return this.page.getByRole('combobox', { name: 'New tables start with' })
+  }
+
+  async chooseNewTableId(choice: NewTableId) {
+    await this.newTableIdSelect().selectOption(choice)
   }
 
   // ---- tables
@@ -79,7 +111,7 @@ export class Editor {
 
   // ---- columns (the table must be selected)
 
-  private columnRows(): Locator {
+  columnRows(): Locator {
     return this.page
       .locator('.inspector .column-list')
       .first()
@@ -116,6 +148,9 @@ export class Editor {
     }
     if (spec.notNull && !spec.primaryKey) {
       await row.getByRole('checkbox', { name: 'NOT NULL' }).check()
+    }
+    if (spec.generated) {
+      await row.getByRole('checkbox', { name: 'Auto-generate' }).check()
     }
   }
 

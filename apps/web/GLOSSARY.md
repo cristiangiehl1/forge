@@ -19,3 +19,5 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 **View**: what the web stores in the opaque `view` of a saved Project: node positions and the Viewport. It is cosmetic: a malformed one is replaced by defaults.
 
 **Persistence mode**: `ready` (changes are autosaved) or `blocked` (the stored project could not be read, so nothing is saved until the user starts a new project).
+
+**New-table id preference**: the app setting "New tables start with": `integer` (a generated integer `id`, the default), `uuid` (a generated uuid `id`) or `none`. It only affects tables created afterwards, belongs to the app and not to a project, and is kept under its own storage key.

@@ -49,6 +49,12 @@ test('guided tour: an online shop with six tables and six foreign keys', async (
     await shot(page, 'empty-editor')
   })
 
+  await test.step('Choose what a new table starts with: a generated uuid id', async () => {
+    await editor.chooseNewTableId('uuid')
+    await expect(editor.newTableIdSelect()).toHaveValue('uuid')
+    await shot(page, 'new-table-id-setting')
+  })
+
   await test.step('Create six tables with their columns', async () => {
     await buildShopTables(editor)
     await expect(editor.tables()).toHaveCount(SHOP_TABLES.length)

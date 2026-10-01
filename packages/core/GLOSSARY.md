@@ -23,3 +23,5 @@ The vocabulary of the domain model. Nothing here knows about the canvas.
 **Project**: the saved document: a format version, a Schema, and an opaque `view`. The core owns the envelope, its versioning and the validation of the Schema; it never reads the `view`.
 
 **View**: the opaque slot of a Project that the web fills with node positions and the viewport. To the core it is just JSON to carry along.
+
+**Generated column**: a Column whose value the database produces: an identity for an `integer` or `bigint`, a default (`gen_random_uuid()`) for a `uuid`. It is a flag on the Column (`generated`), allowed only on those three types, and absent means false. Avoid "auto-increment" and "serial" in code and UI text for the model concept.

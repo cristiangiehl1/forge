@@ -28,6 +28,7 @@ The first time on a machine, install the browser once:
 | `tests/tour.spec.ts` | The guided tour. Also asserts the six-table shop and its DDL end to end. |
 | `tests/editing.spec.ts` | New tables, every column type, varchar and numeric parameters, primary keys, deleting tables and columns. |
 | `tests/relationships.spec.ts` | Creating relationships by dragging, the refusals (same source column, different types, target not a primary key), selecting a relationship by clicking its line, removing it (button, Delete key, inspector), and that Backspace with a table selected deletes nothing. |
+| `tests/new-table-id.spec.ts` | The "New tables start with" preference (integer, uuid, none), that it survives a reload and a new project, and the Auto-generate toggle on a column. |
 | `tests/ddl.spec.ts` | The DDL panel: empty project, empty table, quoted names, invalid schema, the full shop. |
 | `tests/persistence.spec.ts` | Reload restores everything, an unreadable or newer stored project is reported and left untouched, blocked browser storage. |
 
@@ -42,5 +43,8 @@ The first time on a machine, install the browser once:
 - `support/shop.ts` is the six-table shop, with the exact DDL it must produce.
 - Every test runs in a fresh browser context, so storage never leaks between
   tests.
+- `Editor.open()` seeds the "New tables start with" preference to `none`, so a
+  new table starts empty and tests build their own columns. Pass
+  `{ newTableId: 'app-default' }` to see the app as a first-time user does.
 
 `pnpm test` does **not** run these: they need a browser and take longer.
