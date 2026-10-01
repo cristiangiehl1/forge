@@ -4,11 +4,11 @@ import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 import type { ColumnKind } from '../../lib/column-types.ts'
 import {
   COLUMN_KINDS,
-  defaultColumnType,
   setNumericPrecision,
   setNumericScale,
   setVarcharLength,
 } from '../../lib/column-types.ts'
+import { supportsGenerated, typeChangePatch } from '../../lib/generated.ts'
 import { nextPrimaryKey } from '../../lib/primary-key.ts'
 import { relationshipsOf } from '../../lib/relationships.ts'
 
@@ -29,9 +29,11 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
         aria-label='Column type'
         value={column.type.kind}
         onChange={(event) =>
-          updateColumn(table.id, column.id, {
-            type: defaultColumnType(event.target.value as ColumnKind),
-          })
+          updateColumn(
+            table.id,
+            column.id,
+            typeChangePatch(column, event.target.value as ColumnKind)
+          )
         }>
         {COLUMN_KINDS.map((kind) => (
           <option key={kind} value={kind}>
@@ -110,6 +112,20 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
         />
         NOT NULL
       </label>
+      {supportsGenerated(column.type) && (
+        <label>
+          <input
+            type='checkbox'
+            checked={column.generated === true}
+            onChange={(event) =>
+              updateColumn(table.id, column.id, {
+                generated: event.target.checked,
+              })
+            }
+          />
+          Auto-generate
+        </label>
+      )}
       <button
         type='button'
         aria-label='Remove column'

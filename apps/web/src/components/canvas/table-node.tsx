@@ -32,6 +32,11 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
             {table.primaryKey.includes(column.id) && (
               <span className='table-node__badge'>PK</span>
             )}
+            {column.generated && (
+              <span className='table-node__badge table-node__badge--auto'>
+                auto
+              </span>
+            )}
             <span className='table-node__name'>
               {column.name || '(unnamed)'}
             </span>

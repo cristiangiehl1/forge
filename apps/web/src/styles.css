@@ -259,3 +259,17 @@ button {
 .column-row--selected {
   border-color: var(--accent);
 }
+
+.toolbar__field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.table-node__badge--auto {
+  color: var(--muted);
+  border-color: var(--muted);
+}
