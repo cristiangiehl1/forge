@@ -8,12 +8,14 @@ import type {
   Table,
   TableId,
 } from './types.ts'
+import { GENERATED_COLUMN_KINDS } from './types.ts'
 
 export type IssueCode =
   | 'empty-table-name'
   | 'duplicate-table-name'
   | 'empty-column-name'
   | 'duplicate-column-name'
+  | 'generated-unsupported-type'
   | 'multiple-relationships-from-column'
   | 'relationship-unknown-column'
   | 'relationship-type-mismatch'
@@ -167,6 +169,21 @@ export function validate(schema: Schema): Issue[] {
         )
       }
       seenColumns.add(column.name)
+
+      if (
+        column.generated &&
+        !(GENERATED_COLUMN_KINDS as readonly string[]).includes(
+          column.type.kind
+        )
+      ) {
+        issues.push(
+          issue(
+            'generated-unsupported-type',
+            `Column "${table.name}.${column.name}" cannot be generated: only integer, bigint and uuid columns can.`,
+            ids
+          )
+        )
+      }
     }
   }
 

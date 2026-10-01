@@ -25,11 +25,19 @@ export type ColumnType =
   | { kind: 'varchar'; length: number }
   | { kind: 'numeric'; precision: number; scale: number }
 
+/** The kinds a database can generate a value for: identity or a default. */
+export const GENERATED_COLUMN_KINDS = ['integer', 'bigint', 'uuid'] as const
+
 export interface Column {
   id: ColumnId
   name: string
   type: ColumnType
   nullable: boolean
+  /**
+   * The database generates the value (identity for integers, a default for a
+   * uuid). Absent means false, which keeps projects saved before it valid.
+   */
+  generated?: boolean
 }
 
 export interface Table {

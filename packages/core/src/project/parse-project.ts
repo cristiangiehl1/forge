@@ -110,7 +110,17 @@ function parseColumn(
   if (id === undefined || name === undefined || type === undefined) {
     return undefined
   }
-  return { id, name, type, nullable: raw.nullable }
+  if (raw.generated !== undefined && typeof raw.generated !== 'boolean') {
+    fail(`${path}.generated`, '"generated" must be a boolean.')
+    return undefined
+  }
+  return {
+    id,
+    name,
+    type,
+    nullable: raw.nullable,
+    ...(typeof raw.generated === 'boolean' ? { generated: raw.generated } : {}),
+  }
 }
 
 function parseTable(raw: unknown, path: string, fail: Fail): Table | undefined {

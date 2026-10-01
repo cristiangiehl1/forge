@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { addRelationship } from '../../../schema/operations.ts'
+import type { ColumnType } from '../../../schema/types.ts'
 import { checkRelationship, validate } from '../../../schema/validate.ts'
 import { ordersToUsers, usersOrders } from '../../helpers/fixtures.ts'
 import { column, schemaOf, table } from '../../helpers/schema-builders.ts'
@@ -236,5 +237,43 @@ describe('checkRelationship', () => {
       )?.code,
       'relationship-unknown-column'
     )
+  })
+})
+
+describe('validate: generated columns', () => {
+  const withColumn = (type: ColumnType, generated?: boolean) =>
+    schemaOf([
+      table('t', 't', [
+        {
+          ...column('c', 'c', type),
+          ...(generated === undefined ? {} : { generated }),
+        },
+      ]),
+    ])
+
+  it('accepts a generated integer, bigint or uuid column', () => {
+    for (const kind of ['integer', 'bigint', 'uuid'] as const) {
+      assert.deepEqual(validate(withColumn({ kind }, true)), [])
+    }
+  })
+
+  it('accepts a column that is not generated, whatever its type', () => {
+    assert.deepEqual(validate(withColumn({ kind: 'text' })), [])
+    assert.deepEqual(validate(withColumn({ kind: 'text' }, false)), [])
+  })
+
+  it('flags a generated column of a type the database cannot generate', () => {
+    for (const type of [
+      { kind: 'text' },
+      { kind: 'boolean' },
+      { kind: 'varchar', length: 10 },
+      { kind: 'numeric', precision: 5, scale: 2 },
+    ] as ColumnType[]) {
+      const issues = validate(withColumn(type, true))
+      assert.equal(issues.length, 1)
+      assert.equal(issues[0]?.code, 'generated-unsupported-type')
+      assert.equal(issues[0]?.tableId, 't')
+      assert.equal(issues[0]?.columnId, 'c')
+    }
   })
 })

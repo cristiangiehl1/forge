@@ -26,7 +26,10 @@ function createTable(table: Table, dialect: Dialect): string {
   const quote = (name: string) => dialect.quoteIdentifier(name)
   const lines = table.columns.map((column) => {
     const required = !column.nullable || table.primaryKey.includes(column.id)
-    return `  ${quote(column.name)} ${dialect.typeName(column.type)}${required ? ' NOT NULL' : ''}`
+    const generated = column.generated
+      ? dialect.generatedClause(column.type)
+      : null
+    return `  ${quote(column.name)} ${dialect.typeName(column.type)}${required ? ' NOT NULL' : ''}${generated ? ` ${generated}` : ''}`
   })
   if (table.primaryKey.length > 0) {
     const names = table.primaryKey.map((id) =>

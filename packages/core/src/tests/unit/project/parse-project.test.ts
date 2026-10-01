@@ -142,3 +142,34 @@ describe('parseProject', () => {
     )
   })
 })
+
+describe('parseProject: generated columns', () => {
+  it('keeps generated: true on a column', () => {
+    const input = valid()
+    input.schema.tables[0].columns[0].generated = true
+    const result = parseProject(input)
+    assert.ok(result.ok)
+    assert.equal(result.project.schema.tables[0]?.columns[0]?.generated, true)
+  })
+
+  it('accepts a project saved before the field existed', () => {
+    const result = parseProject(valid())
+    assert.ok(result.ok)
+    assert.equal(
+      result.project.schema.tables[0]?.columns[0]?.generated,
+      undefined
+    )
+  })
+
+  it('rejects a generated value that is not a boolean', () => {
+    const input = valid()
+    input.schema.tables[0].columns[0].generated = 'yes'
+    assert.equal(firstErrorPath(input), 'schema.tables[0].columns[0].generated')
+  })
+
+  it('accepts generated on a type that cannot be generated: it is a draft', () => {
+    const input = valid()
+    input.schema.tables[0].columns[1].generated = true // a varchar column
+    assert.ok(parseProject(input).ok)
+  })
+})

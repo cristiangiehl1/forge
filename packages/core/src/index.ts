@@ -29,6 +29,7 @@ export type {
   TableId,
 } from './schema/types.ts'
 export {
+  GENERATED_COLUMN_KINDS,
   MAX_NUMERIC_PRECISION,
   MAX_VARCHAR_LENGTH,
   SIMPLE_COLUMN_KINDS,
