@@ -125,6 +125,9 @@ export function Inspector() {
     state.schema.tables.find((candidate) => candidate.id === state.selection)
   )
   const schema = useForgeStore((state) => state.schema)
+  const selectedRelationship = useForgeStore(
+    (state) => state.relationshipSelection
+  )
   const { renameTable, removeTable, addColumn, removeRelationship } =
     forgeStore.getState()
 
@@ -161,7 +164,13 @@ export function Inspector() {
       ) : (
         <ul className='column-list'>
           {relationshipsOf(schema, table.id).map((relationship) => (
-            <li key={relationship.id} className='column-row'>
+            <li
+              key={relationship.id}
+              className={
+                relationship.id === selectedRelationship
+                  ? 'column-row column-row--selected'
+                  : 'column-row'
+              }>
               <span className='relationship-label'>{relationship.label}</span>
               <button
                 type='button'

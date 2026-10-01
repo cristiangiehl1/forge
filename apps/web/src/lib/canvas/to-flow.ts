@@ -1,4 +1,4 @@
-import type { ColumnRef, Schema, TableId } from '@forge/core'
+import type { ColumnRef, RelationshipId, Schema, TableId } from '@forge/core'
 import type { Edge, Node } from '@xyflow/react'
 
 import type { ProjectView } from '../project-view.ts'
@@ -24,13 +24,18 @@ export function toFlowNodes(
 }
 
 /** One edge per relationship; the handle ids are the column ids. */
-export function toFlowEdges(schema: Schema): Edge[] {
+export function toFlowEdges(
+  schema: Schema,
+  selectedRelationship: RelationshipId | null
+): Edge[] {
   return schema.relationships.map((relationship) => ({
     id: relationship.id,
+    type: 'relationship',
     source: relationship.from.tableId,
     sourceHandle: relationship.from.columnId,
     target: relationship.to.tableId,
     targetHandle: relationship.to.columnId,
+    selected: relationship.id === selectedRelationship,
   }))
 }
 

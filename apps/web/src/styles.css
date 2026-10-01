@@ -242,3 +242,20 @@ button {
   font-family: ui-monospace, monospace;
   font-size: 12px;
 }
+
+.edge-delete {
+  position: absolute;
+  pointer-events: all;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  color: var(--error-text);
+  background: var(--panel);
+  border: 1px solid var(--error-text);
+  border-radius: 50%;
+}
+
+.column-row--selected {
+  border-color: var(--accent);
+}

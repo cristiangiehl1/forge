@@ -66,19 +66,39 @@ describe('toFlowNodes', () => {
 
 describe('toFlowEdges', () => {
   it('creates one edge per relationship from column handle to column handle', () => {
-    assert.deepEqual(toFlowEdges(schema), [
+    assert.deepEqual(toFlowEdges(schema, null), [
       {
         id: 'r',
+        type: 'relationship',
         source: 'b',
         sourceHandle: 'b1',
         target: 'a',
         targetHandle: 'a1',
+        selected: false,
       },
     ])
   })
 
+  it('marks only the selected relationship as selected', () => {
+    const two: Schema = {
+      ...schema,
+      relationships: [
+        ...schema.relationships,
+        {
+          id: 's',
+          from: { tableId: 'a', columnId: 'a1' },
+          to: { tableId: 'a', columnId: 'a1' },
+        },
+      ],
+    }
+    assert.deepEqual(
+      toFlowEdges(two, 's').map((edge) => edge.selected),
+      [false, true]
+    )
+  })
+
   it('returns no edges for a schema without relationships', () => {
-    assert.deepEqual(toFlowEdges({ ...schema, relationships: [] }), [])
+    assert.deepEqual(toFlowEdges({ ...schema, relationships: [] }, null), [])
   })
 })
 

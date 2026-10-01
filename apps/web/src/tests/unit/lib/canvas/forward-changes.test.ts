@@ -7,9 +7,13 @@ import {
   forwardNodeChanges,
 } from '../../../../lib/canvas/forward-changes.ts'
 
-function recorder(selection: string | null = null) {
+function recorder(
+  selection: string | null = null,
+  relationship: string | null = null
+) {
   const calls: unknown[][] = []
   let current = selection
+  let currentRelationship = relationship
   const actions: CanvasActions = {
     moveNode: (id, position) => {
       calls.push(['moveNode', id, position])
@@ -22,6 +26,11 @@ function recorder(selection: string | null = null) {
       calls.push(['removeRelationship', id])
     },
     currentSelection: () => current,
+    selectRelationship: (id) => {
+      calls.push(['selectRelationship', id])
+      currentRelationship = id
+    },
+    currentRelationshipSelection: () => currentRelationship,
   }
   return { actions, calls }
 }
@@ -104,14 +113,45 @@ describe('forwardEdgeChanges', () => {
     assert.deepEqual(calls, [['removeRelationship', 'r1']])
   })
 
-  it('ignores edge selection and any other change', () => {
+  it('selects a relationship when React Flow reports its edge selected', () => {
+    const { actions, calls } = recorder()
+    forwardEdgeChanges([{ type: 'select', id: 'r1', selected: true }], actions)
+    assert.deepEqual(calls, [['selectRelationship', 'r1']])
+  })
+
+  it('clears the relationship selection when the selected edge is deselected', () => {
+    const { actions, calls } = recorder(null, 'r1')
+    forwardEdgeChanges([{ type: 'select', id: 'r1', selected: false }], actions)
+    assert.deepEqual(calls, [['selectRelationship', null]])
+  })
+
+  it('leaves the selection alone when another edge is deselected', () => {
+    const { actions, calls } = recorder(null, 'r2')
+    forwardEdgeChanges([{ type: 'select', id: 'r1', selected: false }], actions)
+    assert.deepEqual(calls, [])
+  })
+
+  it('ends on the new relationship when one edge replaces another', () => {
+    for (const order of [
+      [
+        { type: 'select', id: 'r1', selected: false },
+        { type: 'select', id: 'r2', selected: true },
+      ],
+      [
+        { type: 'select', id: 'r2', selected: true },
+        { type: 'select', id: 'r1', selected: false },
+      ],
+    ]) {
+      const { actions } = recorder(null, 'r1')
+      forwardEdgeChanges(order, actions)
+      assert.equal(actions.currentRelationshipSelection(), 'r2')
+    }
+  })
+
+  it('ignores the changes the app does not own', () => {
     const { actions, calls } = recorder()
     forwardEdgeChanges(
-      [
-        { type: 'select', id: 'r1', selected: true },
-        { type: 'add' },
-        { type: 'replace', id: 'r1' },
-      ],
+      [{ type: 'add' }, { type: 'replace', id: 'r1' }],
       actions
     )
     assert.deepEqual(calls, [])

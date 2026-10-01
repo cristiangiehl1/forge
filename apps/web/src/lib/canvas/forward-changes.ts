@@ -7,6 +7,8 @@ export interface CanvasActions {
   select: (tableId: TableId | null) => void
   removeRelationship: (relationshipId: RelationshipId) => void
   currentSelection: () => TableId | null
+  selectRelationship: (relationshipId: RelationshipId | null) => void
+  currentRelationshipSelection: () => RelationshipId | null
 }
 
 /** The part of a React Flow node change the app reads. */
@@ -53,8 +55,15 @@ export function forwardEdgeChanges(
   actions: CanvasActions
 ): void {
   for (const change of changes) {
-    if (change.type === 'remove' && change.id !== undefined) {
+    if (change.id === undefined) continue
+    if (change.type === 'remove') {
       actions.removeRelationship(change.id)
+    } else if (change.type === 'select') {
+      if (change.selected) {
+        actions.selectRelationship(change.id)
+      } else if (actions.currentRelationshipSelection() === change.id) {
+        actions.selectRelationship(null)
+      }
     }
   }
 }

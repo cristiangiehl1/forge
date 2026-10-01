@@ -26,6 +26,8 @@ export interface ForgeState {
   schema: Schema
   view: ProjectView
   selection: TableId | null
+  /** At most one of `selection` and `relationshipSelection` is set. */
+  relationshipSelection: RelationshipId | null
   hydrated: boolean
   persistence: PersistenceMode
   notice: StartupNotice | null
@@ -52,6 +54,8 @@ export interface ForgeState {
   moveNode: (tableId: TableId, position: NodePosition) => void
   setViewport: (viewport: Viewport) => void
   select: (tableId: TableId | null) => void
+  selectRelationship: (relationshipId: RelationshipId | null) => void
+  clearSelection: () => void
 }
 
 export interface ForgeStoreDeps {
@@ -63,7 +67,12 @@ const emptyProject = () => ({
   schema: core.createSchema(),
   view: createView(),
   selection: null,
+  relationshipSelection: null,
 })
+
+/** A relationship selection survives only while that relationship exists. */
+const stillSelected = (schema: Schema, id: RelationshipId | null) =>
+  id !== null && schema.relationships.some((r) => r.id === id) ? id : null
 
 function nextName(prefix: string, taken: string[]): string {
   let attempt = taken.length + 1
@@ -85,6 +94,7 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
             schema: result.project.schema,
             view: parseView(result.project.view),
             selection: null,
+            relationshipSelection: null,
             hydrated: true,
             persistence: 'ready',
             notice: null,
@@ -145,12 +155,14 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
       set({ schema: core.renameTable(get().schema, tableId, name) }),
 
     removeTable: (tableId) => {
-      const { schema, view, selection } = get()
+      const { schema, view, selection, relationshipSelection } = get()
       const { [tableId]: _removed, ...nodes } = view.nodes
+      const next = core.removeTable(schema, tableId)
       set({
-        schema: core.removeTable(schema, tableId),
+        schema: next,
         view: { ...view, nodes },
         selection: selection === tableId ? null : selection,
+        relationshipSelection: stillSelected(next, relationshipSelection),
       })
     },
 
@@ -177,8 +189,13 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
         schema: core.updateColumn(get().schema, tableId, columnId, patch),
       }),
 
-    removeColumn: (tableId, columnId) =>
-      set({ schema: core.removeColumn(get().schema, tableId, columnId) }),
+    removeColumn: (tableId, columnId) => {
+      const next = core.removeColumn(get().schema, tableId, columnId)
+      set({
+        schema: next,
+        relationshipSelection: stillSelected(next, get().relationshipSelection),
+      })
+    },
 
     setPrimaryKey: (tableId, columnIds) =>
       set({ schema: core.setPrimaryKey(get().schema, tableId, columnIds) }),
@@ -193,10 +210,13 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
       return null
     },
 
-    removeRelationship: (relationshipId) =>
+    removeRelationship: (relationshipId) => {
+      const next = core.removeRelationship(get().schema, relationshipId)
       set({
-        schema: core.removeRelationship(get().schema, relationshipId),
-      }),
+        schema: next,
+        relationshipSelection: stillSelected(next, get().relationshipSelection),
+      })
+    },
 
     moveNode: (tableId, position) => {
       const { view } = get()
@@ -207,6 +227,22 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
 
     setViewport: (viewport) => set({ view: { ...get().view, viewport } }),
 
-    select: (tableId) => set({ selection: tableId }),
+    // Deselecting a table must not clear a relationship that was just selected:
+    // React Flow reports "table deselected" in the same batch as "edge selected".
+    select: (tableId) =>
+      set(
+        tableId === null
+          ? { selection: null }
+          : { selection: tableId, relationshipSelection: null }
+      ),
+
+    selectRelationship: (relationshipId) =>
+      set(
+        relationshipId === null
+          ? { relationshipSelection: null }
+          : { relationshipSelection: relationshipId, selection: null }
+      ),
+
+    clearSelection: () => set({ selection: null, relationshipSelection: null }),
   }))
 }

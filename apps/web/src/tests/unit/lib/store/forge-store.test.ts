@@ -285,3 +285,104 @@ describe('view and selection', () => {
     assert.equal(store.getState().selection, table)
   })
 })
+
+describe('relationship selection', () => {
+  function connected() {
+    const store = makeStore()
+    const { users, usersId, orders, ordersUser } = withUsersAndOrders(store)
+    store
+      .getState()
+      .connect(
+        { tableId: orders, columnId: ordersUser },
+        { tableId: users, columnId: usersId }
+      )
+    const relationshipId = must(store.getState().schema.relationships[0]?.id)
+    return { store, users, orders, relationshipId }
+  }
+
+  it('starts without a selected relationship', () => {
+    assert.equal(makeStore().getState().relationshipSelection, null)
+  })
+
+  it('selecting a relationship clears the table selection', () => {
+    const { store, relationshipId } = connected()
+    assert.notEqual(store.getState().selection, null)
+    store.getState().selectRelationship(relationshipId)
+    assert.equal(store.getState().relationshipSelection, relationshipId)
+    assert.equal(store.getState().selection, null)
+  })
+
+  it('selecting a table clears the relationship selection', () => {
+    const { store, users, relationshipId } = connected()
+    store.getState().selectRelationship(relationshipId)
+    store.getState().select(users)
+    assert.equal(store.getState().selection, users)
+    assert.equal(store.getState().relationshipSelection, null)
+  })
+
+  it('deselecting the table does not touch the relationship selection', () => {
+    const { store, relationshipId } = connected()
+    store.getState().selectRelationship(relationshipId)
+    store.getState().select(null)
+    assert.equal(store.getState().relationshipSelection, relationshipId)
+  })
+
+  it('selectRelationship(null) clears only the relationship selection', () => {
+    const { store, users, relationshipId } = connected()
+    store.getState().select(users)
+    store.getState().selectRelationship(relationshipId)
+    store.getState().selectRelationship(null)
+    assert.equal(store.getState().relationshipSelection, null)
+  })
+
+  it('clearSelection clears both selections', () => {
+    const { store, users, relationshipId } = connected()
+    store.getState().select(users)
+    store.getState().clearSelection()
+    store.getState().selectRelationship(relationshipId)
+    store.getState().clearSelection()
+    assert.equal(store.getState().selection, null)
+    assert.equal(store.getState().relationshipSelection, null)
+  })
+
+  it('removing the selected relationship clears the selection', () => {
+    const { store, relationshipId } = connected()
+    store.getState().selectRelationship(relationshipId)
+    store.getState().removeRelationship(relationshipId)
+    assert.equal(store.getState().schema.relationships.length, 0)
+    assert.equal(store.getState().relationshipSelection, null)
+  })
+
+  it('removing another relationship keeps the selection', () => {
+    const { store, relationshipId } = connected()
+    store.getState().selectRelationship(relationshipId)
+    store.getState().removeRelationship('does-not-exist')
+    assert.equal(store.getState().relationshipSelection, relationshipId)
+  })
+
+  it('removing a table or column that takes the relationship with it clears the selection', () => {
+    const viaTable = connected()
+    viaTable.store.getState().selectRelationship(viaTable.relationshipId)
+    viaTable.store.getState().removeTable(viaTable.users)
+    assert.equal(viaTable.store.getState().relationshipSelection, null)
+
+    const viaColumn = connected()
+    viaColumn.store.getState().selectRelationship(viaColumn.relationshipId)
+    const column = must(
+      viaColumn.store.getState().schema.relationships[0]?.from.columnId
+    )
+    viaColumn.store.getState().removeColumn(viaColumn.orders, column)
+    assert.equal(viaColumn.store.getState().relationshipSelection, null)
+  })
+
+  it('a fresh project has no selected relationship', () => {
+    const { store, relationshipId } = connected()
+    store.getState().selectRelationship(relationshipId)
+    store.getState().startNewProject()
+    assert.equal(store.getState().relationshipSelection, null)
+
+    store.getState().selectRelationship('x')
+    store.getState().hydrate({ status: 'empty' })
+    assert.equal(store.getState().relationshipSelection, null)
+  })
+})

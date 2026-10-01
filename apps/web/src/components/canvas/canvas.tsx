@@ -4,6 +4,7 @@ import { Background, Controls, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
+import { edgesOnly } from '../../lib/canvas/deletion-guard.ts'
 import type { CanvasActions } from '../../lib/canvas/forward-changes.ts'
 import {
   forwardEdgeChanges,
@@ -15,9 +16,11 @@ import {
   toFlowEdges,
   toFlowNodes,
 } from '../../lib/canvas/to-flow.ts'
+import { RelationshipEdge } from './relationship-edge.tsx'
 import { TableNode } from './table-node.tsx'
 
 const nodeTypes = { table: TableNode }
+const edgeTypes = { relationship: RelationshipEdge }
 
 const canvasActions: CanvasActions = {
   moveNode: (tableId, position) =>
@@ -26,15 +29,22 @@ const canvasActions: CanvasActions = {
   removeRelationship: (relationshipId) =>
     forgeStore.getState().removeRelationship(relationshipId),
   currentSelection: () => forgeStore.getState().selection,
+  selectRelationship: (relationshipId) =>
+    forgeStore.getState().selectRelationship(relationshipId),
+  currentRelationshipSelection: () =>
+    forgeStore.getState().relationshipSelection,
 }
 
 export function Canvas() {
   const schema = useForgeStore((state) => state.schema)
   const view = useForgeStore((state) => state.view)
   const selection = useForgeStore((state) => state.selection)
+  const relationshipSelection = useForgeStore(
+    (state) => state.relationshipSelection
+  )
 
   const nodes = toFlowNodes(schema, view, selection)
-  const edges = toFlowEdges(schema)
+  const edges = toFlowEdges(schema, relationshipSelection)
 
   function isValidConnection(connection: Connection | Edge) {
     const refs = connectionToRefs(connection)
@@ -50,15 +60,16 @@ export function Canvas() {
     if (refs) forgeStore.getState().connect(refs.from, refs.to)
   }
 
-  // `deleteKeyCode={null}` turns off React Flow's keyboard deletion. With a table
-  // selected, Backspace used to delete every relationship touching it (and keep
-  // the table), silently. Tables and relationships are removed from the
-  // inspector, where the action is visible.
+  // Delete/Backspace removes a selected relationship, and nothing else:
+  // `onBeforeDelete` refuses any deletion that includes a table. Without that,
+  // Backspace with a table selected deleted every relationship touching it
+  // (and kept the table), silently. Tables are removed from the inspector.
   return (
     <ReactFlow
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
+      edgeTypes={edgeTypes}
       onNodesChange={(changes: NodeChange<TableFlowNode>[]) =>
         forwardNodeChanges(changes, canvasActions)
       }
@@ -68,10 +79,11 @@ export function Canvas() {
       onConnect={onConnect}
       isValidConnection={isValidConnection}
       onNodeClick={(_, node) => forgeStore.getState().select(node.id)}
-      onPaneClick={() => forgeStore.getState().select(null)}
+      onPaneClick={() => forgeStore.getState().clearSelection()}
       onMoveEnd={(_, viewport) => forgeStore.getState().setViewport(viewport)}
       defaultViewport={view.viewport}
-      deleteKeyCode={null}
+      deleteKeyCode={['Backspace', 'Delete']}
+      onBeforeDelete={async (deletion) => edgesOnly(deletion)}
       colorMode='system'>
       <Background />
       <Controls showInteractive={false} />

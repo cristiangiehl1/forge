@@ -8,7 +8,7 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 
 **Viewport**: the pan and zoom of the canvas (`x`, `y`, `zoom`), saved with the project.
 
-**Selection**: the Table currently chosen, shown in the Inspector; at most one, or none.
+**Selection**: the Table currently chosen, shown in the Inspector; at most one, or none. A Relationship can be selected instead by clicking its line, which shows a button to remove it; selecting a Table and selecting a Relationship exclude each other.
 
 **Inspector**: the side panel that edits the selected Table: its name and its columns. The table node itself is read-only.
 
