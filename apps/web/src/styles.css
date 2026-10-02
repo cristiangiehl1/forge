@@ -226,10 +226,15 @@ button {
   display: flex;
   flex: 1 0 100%;
   gap: 6px;
+  min-width: 0;
 }
 
+/* An input has a width of its own; without width 0 and min-width 0 the two
+   fields would stay as wide as they like and spill out of the row. */
 .column-row__extra input {
-  flex: 1;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  width: 0;
   min-width: 0;
 }
 

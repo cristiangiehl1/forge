@@ -86,7 +86,7 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
             )
           }
         />
-        []
+        Array
       </label>
       {(base.kind === 'varchar' || base.kind === 'char') && (
         <NumberField
