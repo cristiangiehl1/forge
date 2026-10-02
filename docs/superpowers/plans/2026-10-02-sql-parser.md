@@ -1846,8 +1846,8 @@ describe('the dispatcher', () => {
       [1, 1, 1, 1]
     )
     assert.deepEqual(warnings, [
-      '5: CREATE EXTENSION statements are not modelled and were ignored.',
-      '6: CREATE VIEW statements are not modelled and were ignored.',
+      '6: CREATE EXTENSION statements are not modelled and were ignored.',
+      '7: CREATE VIEW statements are not modelled and were ignored.',
     ])
   })
 })

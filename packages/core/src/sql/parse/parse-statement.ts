@@ -1,5 +1,12 @@
 import { Cursor } from './cursor.ts'
 import { parseCreateTable } from './parse-create-table.ts'
+import {
+  parseAlterTable,
+  parseComment,
+  parseCreateDomain,
+  parseCreateIndex,
+  parseCreateType,
+} from './parse-other.ts'
 import type { Origin, RawScript } from './raw.ts'
 import type { Statement } from './tokenize.ts'
 
@@ -34,6 +41,7 @@ export function parseStatement(
     line: statement.line,
     text: previewOf(statement.text),
   }
+
   if (cursor.acceptWord('create')) {
     cursor.acceptWords('or', 'replace')
     cursor.acceptWord('global', 'local', 'temp', 'temporary', 'unlogged')
@@ -42,6 +50,28 @@ export function parseStatement(
       if (table) raw.tables.push(table)
       return
     }
+    const unique = cursor.acceptWord('unique') !== null
+    if (cursor.acceptWord('index')) {
+      const index = parseCreateIndex(cursor, origin, unique)
+      if (index) raw.indexes.push(index)
+      return
+    }
+    if (!unique && cursor.acceptWord('type')) {
+      const type = parseCreateType(cursor, origin)
+      if (type) raw.types.push(type)
+      return
+    }
+    if (!unique && cursor.acceptWord('domain')) {
+      raw.types.push(parseCreateDomain(cursor, origin))
+      return
+    }
+  } else if (cursor.acceptWords('alter', 'table')) {
+    parseAlterTable(cursor, origin, raw)
+    return
+  } else if (cursor.acceptWords('comment', 'on')) {
+    const comment = parseComment(cursor, origin)
+    if (comment) raw.comments.push(comment)
+    return
   }
   ignored(statement, warn)
 }
