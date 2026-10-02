@@ -1,5 +1,5 @@
 import { generateDdl, postgres } from '@forge/core'
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 
@@ -59,27 +59,28 @@ export function DdlPanel() {
           <pre>
             <code>
               {result.statements.map((statement, index) => (
-                <Fragment key={statement.key}>
-                  {/* biome-ignore lint/a11y/noStaticElementInteractions: a pointer-only link between a statement and its table; nothing here is needed to use the app */}
-                  <span
-                    onMouseEnter={() =>
-                      forgeStore.getState().hoverTable(statement.tableId)
-                    }
-                    onMouseLeave={() => forgeStore.getState().hoverTable(null)}
-                    ref={
-                      statement.tableId === hoveredTable &&
-                      statement.kind === 'create'
-                        ? activeRef
-                        : null
-                    }
-                    data-table={statement.tableId}
-                    className={
-                      statement.tableId === hoveredTable ? 'ddl-active' : ''
-                    }>
-                    {statement.sql}
-                  </span>
+                // biome-ignore lint/a11y/noStaticElementInteractions: a pointer-only link between a statement and its table; nothing here is needed to use the app
+                <span
+                  key={statement.key}
+                  ref={
+                    statement.tableId === hoveredTable &&
+                    statement.kind === 'create'
+                      ? activeRef
+                      : null
+                  }
+                  data-table={statement.tableId}
+                  className={
+                    statement.tableId === hoveredTable
+                      ? 'ddl-statement ddl-active'
+                      : 'ddl-statement'
+                  }
+                  onMouseEnter={() =>
+                    forgeStore.getState().hoverTable(statement.tableId)
+                  }
+                  onMouseLeave={() => forgeStore.getState().hoverTable(null)}>
+                  {statement.sql}
                   {index < result.statements.length - 1 ? '\n\n' : '\n'}
-                </Fragment>
+                </span>
               ))}
             </code>
           </pre>

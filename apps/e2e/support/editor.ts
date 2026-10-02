@@ -277,6 +277,8 @@ export class Editor {
 
   async ddl(): Promise<string> {
     await this.showDdl()
-    return this.page.locator('.ddl-panel pre').innerText()
+    // textContent, not innerText: statements are blocks, and innerText would
+    // add its own line breaks between them.
+    return (await this.page.locator('.ddl-panel pre').textContent()) ?? ''
   }
 }

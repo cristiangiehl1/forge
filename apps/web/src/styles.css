@@ -312,16 +312,16 @@ button {
   stroke-width: 3px;
 }
 
-/* The hovered table's statement is marked by an accent bar down its left side,
-   in the gutter; the text is left alone, so it never looks like a selection. */
-.ddl-panel pre {
-  padding-left: 14px;
+/* Each statement is a block, so hovering anywhere in it (blank line included)
+   counts. The hovered table's statement gets an accent bar in the gutter; the
+   text is left alone, so it never looks like a selection. */
+.ddl-statement {
+  display: block;
+  margin-left: -10px;
+  padding-left: 10px;
+  border-left: 4px solid transparent;
 }
 
 .ddl-active {
-  box-decoration-break: clone;
-  -webkit-box-decoration-break: clone;
-  padding-left: 10px;
-  margin-left: -10px;
-  box-shadow: inset 4px 0 0 var(--accent);
+  border-left-color: var(--accent);
 }
