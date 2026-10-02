@@ -184,6 +184,23 @@ button {
   border-radius: 6px;
 }
 
+.index-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.index-row__columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+}
+
 .column-row__extra {
   display: flex;
   flex: 1 0 100%;

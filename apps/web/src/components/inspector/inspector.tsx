@@ -22,6 +22,7 @@ import {
 import { nextPrimaryKey } from '../../lib/primary-key.ts'
 import { relationshipsOf } from '../../lib/relationships.ts'
 import { ConfirmButton } from '../confirm-button.tsx'
+import { IndexList } from './index-list.tsx'
 import { NumberField } from './number-field.tsx'
 
 function ColumnRow({ table, column }: { table: Table; column: Column }) {
@@ -211,8 +212,13 @@ export function Inspector() {
   const selectedRelationship = useForgeStore(
     (state) => state.relationshipSelection
   )
-  const { renameTable, removeTable, addColumn, removeRelationship } =
-    forgeStore.getState()
+  const {
+    renameTable,
+    removeTable,
+    addColumn,
+    removeRelationship,
+    setTableComment,
+  } = forgeStore.getState()
 
   if (!table) {
     return (
@@ -234,12 +240,21 @@ export function Inspector() {
           onChange={(event) => renameTable(table.id, event.target.value)}
         />
       </label>
+      <label className='field'>
+        Table comment
+        <input
+          aria-label='Table comment'
+          value={table.comment ?? ''}
+          onChange={(event) => setTableComment(table.id, event.target.value)}
+        />
+      </label>
       <h2 className='inspector__heading'>Columns</h2>
       <ul className='column-list'>
         {table.columns.map((column) => (
           <ColumnRow key={column.id} table={table} column={column} />
         ))}
       </ul>
+      <IndexList table={table} />
       <h2 className='inspector__heading'>Relationships</h2>
       {relationshipsOf(schema, table.id).length === 0 ? (
         <p className='inspector__hint'>
