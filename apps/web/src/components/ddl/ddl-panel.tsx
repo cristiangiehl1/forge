@@ -58,30 +58,35 @@ export function DdlPanel() {
           </button>
           <pre>
             <code>
-              {result.statements.map((statement, index) => (
-                // biome-ignore lint/a11y/noStaticElementInteractions: a pointer-only link between a statement and its table; nothing here is needed to use the app
-                <span
-                  key={statement.key}
-                  ref={
-                    statement.tableId === hoveredTable &&
-                    statement.kind === 'create'
-                      ? activeRef
-                      : null
-                  }
-                  data-table={statement.tableId}
-                  className={
-                    statement.tableId === hoveredTable
-                      ? 'ddl-statement ddl-active'
-                      : 'ddl-statement'
-                  }
-                  onMouseEnter={() =>
-                    forgeStore.getState().hoverTable(statement.tableId)
-                  }
-                  onMouseLeave={() => forgeStore.getState().hoverTable(null)}>
-                  {statement.sql}
-                  {index < result.statements.length - 1 ? '\n\n' : '\n'}
-                </span>
-              ))}
+              {result.statements.map((statement, index) => {
+                const tableId =
+                  'tableId' in statement ? statement.tableId : null
+                const active = tableId !== null && tableId === hoveredTable
+                return (
+                  // biome-ignore lint/a11y/noStaticElementInteractions: a pointer-only link between a statement and its table; nothing here is needed to use the app
+                  <span
+                    key={statement.key}
+                    ref={
+                      active && statement.kind === 'create' ? activeRef : null
+                    }
+                    data-table={tableId ?? undefined}
+                    data-type={
+                      statement.kind === 'type' ? statement.typeId : undefined
+                    }
+                    className={
+                      active ? 'ddl-statement ddl-active' : 'ddl-statement'
+                    }
+                    onMouseEnter={() => {
+                      if (tableId !== null) {
+                        forgeStore.getState().hoverTable(tableId)
+                      }
+                    }}
+                    onMouseLeave={() => forgeStore.getState().hoverTable(null)}>
+                    {statement.sql}
+                    {index < result.statements.length - 1 ? '\n\n' : '\n'}
+                  </span>
+                )
+              })}
             </code>
           </pre>
         </>
