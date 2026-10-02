@@ -60,3 +60,8 @@ export type {
   GenerateResult,
 } from './sql/generate/generate-ddl.ts'
 export { generateDdl } from './sql/generate/generate-ddl.ts'
+export type {
+  ImportMessage,
+  ImportResult,
+} from './sql/parse/import-sql.ts'
+export { importSql } from './sql/parse/import-sql.ts'

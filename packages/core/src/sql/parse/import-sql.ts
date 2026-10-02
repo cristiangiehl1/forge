@@ -1,0 +1,74 @@
+import type { Schema } from '../../schema/types.ts'
+import { validate } from '../../schema/validate.ts'
+import { buildSchema } from './build-schema.ts'
+import { ParseFailure } from './cursor.ts'
+import { parseStatement, previewOf } from './parse-statement.ts'
+import { emptyScript } from './raw.ts'
+import { splitStatements, tokenize } from './tokenize.ts'
+
+export interface ImportMessage {
+  /** 1-based; 0 for a problem of the whole schema. */
+  line: number
+  /** The statement it is about, shortened; empty for a lexical problem. */
+  statement: string
+  message: string
+}
+
+export interface ImportResult {
+  schema: Schema
+  warnings: ImportMessage[]
+  errors: ImportMessage[]
+}
+
+/**
+ * Reads a PostgreSQL script into a schema. What Forge does not model is a
+ * warning; a statement it should understand but cannot is an error, and the
+ * statements around it are still imported.
+ */
+export function importSql(sql: string, newId: () => string): ImportResult {
+  const warnings: ImportMessage[] = []
+  const errors: ImportMessage[] = []
+  const seen = new Set<string>()
+  const addWarning = (message: ImportMessage) => {
+    const key = `${message.line}|${message.statement}|${message.message}`
+    if (seen.has(key)) return
+    seen.add(key)
+    warnings.push(message)
+  }
+
+  const { tokens, errors: lexical } = tokenize(sql)
+  for (const error of lexical) {
+    errors.push({ line: error.line, statement: '', message: error.message })
+  }
+
+  const raw = emptyScript()
+  const statements = splitStatements(sql, tokens)
+  // Tokenizing stopped at a lexical error, so the last statement is cut short:
+  // the lexical error already says so, and parsing the stump would repeat it.
+  if (lexical.length > 0 && tokens[tokens.length - 1]?.value !== ';') {
+    statements.pop()
+  }
+  for (const statement of statements) {
+    const preview = previewOf(statement.text)
+    try {
+      parseStatement(statement, sql, raw, (line, message) => {
+        addWarning({ line, statement: preview, message })
+      })
+    } catch (error) {
+      if (!(error instanceof ParseFailure)) throw error
+      errors.push({
+        line: error.line,
+        statement: preview,
+        message: error.message,
+      })
+    }
+  }
+
+  const schema = buildSchema(raw, newId, (origin, message) => {
+    addWarning({ line: origin.line, statement: origin.text, message })
+  })
+  for (const issue of validate(schema)) {
+    errors.push({ line: 0, statement: '', message: issue.message })
+  }
+  return { schema, warnings, errors }
+}

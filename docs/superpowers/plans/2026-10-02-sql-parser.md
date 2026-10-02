@@ -2506,9 +2506,9 @@ describe('importSql: messages', () => {
     assert.equal(result.errors[0]?.line, 0)
   })
 
-  it('does not repeat the same warning', () => {
-    const result = run('CREATE TABLE t (a int); SET x = 1; SET x = 1;')
-    assert.equal(result.warnings.length, 2)
+  it('does not repeat the same warning for the same statement text on the same line', () => {
+    assert.equal(run('CREATE TABLE t (a int); SET x = 1; SET x = 1;').warnings.length, 1)
+    assert.equal(run('SET x = 1;\nSET x = 1;').warnings.length, 2)
   })
 })
 ```
