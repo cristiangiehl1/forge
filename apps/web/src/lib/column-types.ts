@@ -8,6 +8,7 @@ import {
 export const COLUMN_KINDS = [
   ...SIMPLE_COLUMN_KINDS,
   'varchar',
+  'char',
   'numeric',
 ] as const
 
@@ -22,6 +23,8 @@ export function defaultColumnType(kind: ColumnKind): ColumnType {
   switch (kind) {
     case 'varchar':
       return { kind: 'varchar', length: 255 }
+    case 'char':
+      return { kind: 'char', length: 1 }
     case 'numeric':
       return { kind: 'numeric', precision: 10, scale: 2 }
     default:
@@ -29,15 +32,62 @@ export function defaultColumnType(kind: ColumnKind): ColumnType {
   }
 }
 
-export function formatColumnType(type: ColumnType): string {
+const KIND_LABELS: Partial<Record<ColumnKind, string>> = {
+  timestamp_no_tz: 'timestamp (no tz)',
+  double: 'double precision',
+}
+
+export const kindLabel = (kind: ColumnKind): string => KIND_LABELS[kind] ?? kind
+
+export function formatColumnType(
+  type: ColumnType,
+  userTypeName: (typeId: string) => string = (typeId) => typeId
+): string {
   switch (type.kind) {
     case 'varchar':
       return `varchar(${type.length})`
+    case 'char':
+      return `char(${type.length})`
     case 'numeric':
       return `numeric(${type.precision},${type.scale})`
+    case 'array':
+      return `${formatColumnType(type.of, userTypeName)}[]`
+    case 'user':
+      return userTypeName(type.typeId)
     default:
-      return type.kind
+      return kindLabel(type.kind)
   }
+}
+
+export const baseType = (type: ColumnType): ColumnType =>
+  type.kind === 'array' ? type.of : type
+
+/** Applies a change to the element of an array, or to the type itself. */
+export function mapBase(
+  type: ColumnType,
+  change: (base: ColumnType) => ColumnType
+): ColumnType {
+  return type.kind === 'array'
+    ? { kind: 'array', of: change(type.of) }
+    : change(type)
+}
+
+export function withArray(type: ColumnType, on: boolean): ColumnType {
+  if (on) return type.kind === 'array' ? type : { kind: 'array', of: type }
+  return baseType(type)
+}
+
+/** The value of the type selector: a kind, or `user:<typeId>`. */
+export function choiceOf(type: ColumnType): string {
+  const base = baseType(type)
+  return base.kind === 'user' ? `user:${base.typeId}` : base.kind
+}
+
+export function typeFromChoice(choice: string, asArray: boolean): ColumnType {
+  const base: ColumnType = choice.startsWith('user:')
+    ? { kind: 'user', typeId: choice.slice('user:'.length) }
+    : defaultColumnType(choice as ColumnKind)
+  return withArray(base, asArray)
 }
 
 export function setVarcharLength(type: ColumnType, value: number): ColumnType {

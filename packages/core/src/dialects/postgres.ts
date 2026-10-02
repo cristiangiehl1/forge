@@ -1,7 +1,10 @@
 import type { ColumnType } from '../schema/types.ts'
 import type { Dialect } from './dialect.ts'
 
-function typeName(type: ColumnType): string {
+function typeName(
+  type: ColumnType,
+  userTypeName: (typeId: string) => string = (typeId) => typeId
+): string {
   switch (type.kind) {
     case 'integer':
       return 'integer'
@@ -24,11 +27,35 @@ function typeName(type: ColumnType): string {
       return `varchar(${type.length})`
     case 'numeric':
       return `numeric(${type.precision},${type.scale})`
+    case 'smallint':
+      return 'smallint'
+    case 'real':
+      return 'real'
+    case 'double':
+      return 'double precision'
+    case 'time':
+      return 'time'
+    case 'timestamp_no_tz':
+      return 'timestamp'
+    case 'interval':
+      return 'interval'
+    case 'bytea':
+      return 'bytea'
+    case 'char':
+      return `char(${type.length})`
+    case 'array':
+      return `${typeName(type.of, userTypeName)}[]`
+    case 'user':
+      return userTypeName(type.typeId)
   }
 }
 
 function quoteIdentifier(name: string): string {
   return `"${name.replaceAll('"', '""')}"`
+}
+
+function quoteLiteral(text: string): string {
+  return `'${text.replaceAll("'", "''")}'`
 }
 
 function generatedClause(type: ColumnType): string | null {
@@ -57,4 +84,5 @@ export const postgres: Dialect = {
   generatedClause,
   generatedImpliesNotNull,
   quoteIdentifier,
+  quoteLiteral,
 }

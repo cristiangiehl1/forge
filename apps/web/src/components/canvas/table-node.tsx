@@ -6,8 +6,10 @@ import { useForgeStore } from '../../hooks/use-forge-store.ts'
 import type { TableFlowNode } from '../../lib/canvas/to-flow.ts'
 import { handleId } from '../../lib/canvas/to-flow.ts'
 import { formatColumnType } from '../../lib/column-types.ts'
+import { hasComment } from '../../lib/comments.ts'
 import type { Side } from '../../lib/geometry.ts'
 import { relatedTables } from '../../lib/relationships.ts'
+import { CommentIcon } from './comment-icon.tsx'
 
 /**
  * A connection point on one side of a column row. A source and a target sit on the
@@ -29,6 +31,7 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
   const table = useForgeStore((state) =>
     state.schema.tables.find((candidate) => candidate.id === data.tableId)
   )
+  const userTypes = useForgeStore((state) => state.schema.types)
   const hovered = useForgeStore((state) => state.hoveredTable === data.tableId)
   const relatedToHovered = useForgeStore(
     (state) =>
@@ -48,6 +51,9 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
 
   if (!table) return null
 
+  const typeName = (typeId: string) =>
+    userTypes?.find((type) => type.id === typeId)?.name ?? '?'
+
   return (
     <div
       className={
@@ -57,11 +63,24 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
             ? 'table-node table-node--related-hover'
             : 'table-node'
       }>
-      <div className='table-node__title'>{table.name || '(unnamed)'}</div>
+      <div className='table-node__title'>
+        <span className='table-node__title-text'>
+          {table.name || '(unnamed)'}
+        </span>
+        {hasComment(table.comment) && (
+          <CommentIcon text={table.comment} label='Show table comment' />
+        )}
+      </div>
       <ul className='table-node__columns'>
         {table.columns.map((column) => (
           <li key={column.id} className='table-node__column'>
             <SideHandles columnId={column.id} side='l' />
+            {table.indexes?.some(
+              (index) =>
+                index.unique &&
+                index.columns.length === 1 &&
+                index.columns[0] === column.id
+            ) && <span className='table-node__badge'>UQ</span>}
             {table.primaryKey.includes(column.id) && (
               <span className='table-node__badge'>PK</span>
             )}
@@ -73,8 +92,11 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
             <span className='table-node__name'>
               {column.name || '(unnamed)'}
             </span>
+            {hasComment(column.comment) && (
+              <CommentIcon text={column.comment} label='Show column comment' />
+            )}
             <span className='table-node__type'>
-              {formatColumnType(column.type)}
+              {formatColumnType(column.type, typeName)}
             </span>
             <SideHandles columnId={column.id} side='r' />
           </li>

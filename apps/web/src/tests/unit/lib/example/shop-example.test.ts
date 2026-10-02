@@ -69,6 +69,17 @@ describe('createShopExample', () => {
     for (const column of created) assert.equal(column.generated, true)
   })
 
+  it('shows the model additions: an enum, an index, comments and a default, and stays valid', () => {
+    assert.deepEqual(validate(schema), [])
+    assert.ok((schema.types ?? []).some((type) => type.kind === 'enum'))
+    assert.ok(schema.tables.some((table) => (table.indexes ?? []).length > 0))
+    assert.ok(schema.tables.some((table) => table.comment))
+    const columns = schema.tables.flatMap((table) => table.columns)
+    assert.ok(columns.some((column) => column.comment))
+    assert.ok(columns.some((column) => column.default))
+    assert.ok(columns.some((column) => column.type.kind === 'user'))
+  })
+
   it('shows what the app can do: generated ids, a composite key, several types', () => {
     const columns = schema.tables.flatMap((table) => table.columns)
     assert.ok(

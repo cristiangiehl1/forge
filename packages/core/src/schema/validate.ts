@@ -1,12 +1,16 @@
+import { sameTypeShape, userTypeIdsOf } from './type-shape.ts'
 import type {
   Column,
   ColumnId,
   ColumnRef,
+  IndexId,
   Relationship,
   RelationshipId,
   Schema,
   Table,
   TableId,
+  TypeId,
+  UserType,
 } from './types.ts'
 import { GENERATED_COLUMN_KINDS } from './types.ts'
 
@@ -16,6 +20,19 @@ export type IssueCode =
   | 'empty-column-name'
   | 'duplicate-column-name'
   | 'generated-unsupported-type'
+  | 'generated-with-default'
+  | 'empty-index-name'
+  | 'duplicate-index-name'
+  | 'index-without-columns'
+  | 'index-unknown-column'
+  | 'index-duplicate-column'
+  | 'empty-type-name'
+  | 'duplicate-type-name'
+  | 'enum-without-values'
+  | 'enum-empty-value'
+  | 'enum-duplicate-value'
+  | 'unknown-type'
+  | 'type-cycle'
   | 'multiple-relationships-from-column'
   | 'relationship-unknown-column'
   | 'relationship-type-mismatch'
@@ -27,9 +44,14 @@ export interface Issue {
   tableId?: TableId
   columnId?: ColumnId
   relationshipId?: RelationshipId
+  indexId?: IndexId
+  typeId?: TypeId
 }
 
-type IssueIds = Pick<Issue, 'tableId' | 'columnId' | 'relationshipId'>
+type IssueIds = Pick<
+  Issue,
+  'tableId' | 'columnId' | 'relationshipId' | 'indexId' | 'typeId'
+>
 
 function issue(code: IssueCode, message: string, ids: IssueIds = {}): Issue {
   const result: Issue = { code, message }
@@ -38,6 +60,8 @@ function issue(code: IssueCode, message: string, ids: IssueIds = {}): Issue {
   if (ids.relationshipId !== undefined) {
     result.relationshipId = ids.relationshipId
   }
+  if (ids.indexId !== undefined) result.indexId = ids.indexId
+  if (ids.typeId !== undefined) result.typeId = ids.typeId
   return result
 }
 
@@ -94,7 +118,7 @@ function relationshipIssue(
     )
   }
 
-  if (source.column.type.kind !== target.column.type.kind) {
+  if (!sameTypeShape(source.column.type, target.column.type)) {
     return issue(
       'relationship-type-mismatch',
       `Column "${sourceName}" (${source.column.type.kind}) cannot reference "${targetName}" (${target.column.type.kind}): the types differ.`,
@@ -128,6 +152,9 @@ export function checkRelationship(
 
 export function validate(schema: Schema): Issue[] {
   const issues: Issue[] = []
+  const types = schema.types ?? []
+  const typeIds = new Set(types.map((type) => type.id))
+  const seenIndexNames = new Set<string>()
 
   const seenTables = new Set<string>()
   for (const table of schema.tables) {
@@ -184,6 +211,76 @@ export function validate(schema: Schema): Issue[] {
           )
         )
       }
+
+      if (column.generated && (column.default ?? '').trim() !== '') {
+        issues.push(
+          issue(
+            'generated-with-default',
+            `Column "${table.name}.${column.name}" is generated and also has a default: choose one.`,
+            ids
+          )
+        )
+      }
+      if (userTypeIdsOf(column.type).some((id) => !typeIds.has(id))) {
+        issues.push(
+          issue(
+            'unknown-type',
+            `Column "${table.name}.${column.name}" uses a type that does not exist.`,
+            ids
+          )
+        )
+      }
+    }
+    for (const index of table.indexes ?? []) {
+      const ids = { tableId: table.id, indexId: index.id }
+      if (isBlank(index.name)) {
+        issues.push(
+          issue(
+            'empty-index-name',
+            `An index on table "${table.name}" has an empty name.`,
+            ids
+          )
+        )
+      } else if (seenIndexNames.has(index.name)) {
+        issues.push(
+          issue(
+            'duplicate-index-name',
+            `Index name "${index.name}" is used more than once.`,
+            ids
+          )
+        )
+      }
+      seenIndexNames.add(index.name)
+      if (index.columns.length === 0) {
+        issues.push(
+          issue(
+            'index-without-columns',
+            `Index "${index.name}" has no columns.`,
+            ids
+          )
+        )
+      }
+      const used = new Set<string>()
+      for (const columnId of index.columns) {
+        if (!table.columns.some((column) => column.id === columnId)) {
+          issues.push(
+            issue(
+              'index-unknown-column',
+              `Index "${index.name}" uses a column that does not exist.`,
+              ids
+            )
+          )
+        } else if (used.has(columnId)) {
+          issues.push(
+            issue(
+              'index-duplicate-column',
+              `Index "${index.name}" uses a column twice.`,
+              ids
+            )
+          )
+        }
+        used.add(columnId)
+      }
     }
   }
 
@@ -196,6 +293,89 @@ export function validate(schema: Schema): Issue[] {
       relationship.id
     )
     if (found) issues.push(found)
+  }
+
+  // A domain is in a cycle when following its base types leads back to it.
+  const inCycle = (start: UserType): boolean => {
+    const visited = new Set<string>()
+    const queue = [start]
+    while (queue.length > 0) {
+      const current = queue.pop()
+      if (current?.kind !== 'domain') continue
+      for (const id of userTypeIdsOf(current.base)) {
+        if (id === start.id) return true
+        if (visited.has(id)) continue
+        visited.add(id)
+        const next = types.find((candidate) => candidate.id === id)
+        if (next) queue.push(next)
+      }
+    }
+    return false
+  }
+
+  const seenTypeNames = new Set<string>()
+  for (const userType of types) {
+    const ids = { typeId: userType.id }
+    if (isBlank(userType.name)) {
+      issues.push(issue('empty-type-name', 'A type has an empty name.', ids))
+    } else if (seenTypeNames.has(userType.name)) {
+      issues.push(
+        issue(
+          'duplicate-type-name',
+          `Type name "${userType.name}" is used more than once.`,
+          ids
+        )
+      )
+    }
+    seenTypeNames.add(userType.name)
+    if (userType.kind === 'enum') {
+      if (userType.values.length === 0) {
+        issues.push(
+          issue(
+            'enum-without-values',
+            `Enum "${userType.name}" has no values.`,
+            ids
+          )
+        )
+      }
+      const seenValues = new Set<string>()
+      for (const value of userType.values) {
+        if (value === '') {
+          issues.push(
+            issue(
+              'enum-empty-value',
+              `Enum "${userType.name}" has an empty value.`,
+              ids
+            )
+          )
+        } else if (seenValues.has(value)) {
+          issues.push(
+            issue(
+              'enum-duplicate-value',
+              `Enum "${userType.name}" repeats the value "${value}".`,
+              ids
+            )
+          )
+        }
+        seenValues.add(value)
+      }
+    } else if (inCycle(userType)) {
+      issues.push(
+        issue(
+          'type-cycle',
+          `Domain "${userType.name}" is based on itself, directly or through other domains.`,
+          ids
+        )
+      )
+    } else if (userTypeIdsOf(userType.base).some((id) => !typeIds.has(id))) {
+      issues.push(
+        issue(
+          'unknown-type',
+          `Domain "${userType.name}" is based on a type that does not exist.`,
+          ids
+        )
+      )
+    }
   }
 
   return issues

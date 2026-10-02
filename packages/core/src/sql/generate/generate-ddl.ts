@@ -1,5 +1,14 @@
 import type { Dialect } from '../../dialects/dialect.ts'
-import type { Column, Relationship, Schema, Table } from '../../schema/types.ts'
+import { userTypeIdsOf } from '../../schema/type-shape.ts'
+import type {
+  Column,
+  ColumnType,
+  Index,
+  Relationship,
+  Schema,
+  Table,
+  UserType,
+} from '../../schema/types.ts'
 import type { Issue } from '../../schema/validate.ts'
 import { validate } from '../../schema/validate.ts'
 import { uniqueName } from './constraint-names.ts'
@@ -10,6 +19,7 @@ import { uniqueName } from './constraint-names.ts'
  * that to show which part of the script a table is.
  */
 export type DdlStatement =
+  | { kind: 'type'; key: string; typeId: string; sql: string }
   | { kind: 'create'; key: string; tableId: string; sql: string }
   | {
       kind: 'alter'
@@ -18,10 +28,60 @@ export type DdlStatement =
       relationshipId: string
       sql: string
     }
+  | {
+      kind: 'index'
+      key: string
+      tableId: string
+      indexId: string
+      sql: string
+    }
+  | { kind: 'comment'; key: string; tableId: string; sql: string }
 
 export type GenerateResult =
   | { ok: true; sql: string; statements: DdlStatement[] }
   | { ok: false; issues: Issue[] }
+
+const present = (text: string | undefined): text is string =>
+  text !== undefined && text.trim() !== ''
+
+/** The SQL name of a column type; user types are written by their quoted name. */
+function typeSql(schema: Schema, dialect: Dialect, type: ColumnType): string {
+  return dialect.typeName(type, (typeId) => {
+    const found = schema.types?.find((candidate) => candidate.id === typeId)
+    return dialect.quoteIdentifier(found?.name ?? typeId)
+  })
+}
+
+/** Enums first, then each domain after the types it is based on. */
+function orderTypes(types: UserType[]): UserType[] {
+  const ordered: UserType[] = types.filter((type) => type.kind === 'enum')
+  const pending = types.filter((type) => type.kind === 'domain')
+  while (pending.length > 0) {
+    const next = pending.findIndex(
+      (domain) =>
+        domain.kind === 'domain' &&
+        userTypeIdsOf(domain.base).every((id) =>
+          ordered.some((done) => done.id === id)
+        )
+    )
+    ordered.push(...pending.splice(next === -1 ? 0 : next, 1))
+  }
+  return ordered
+}
+
+function createType(schema: Schema, type: UserType, dialect: Dialect): string {
+  const name = dialect.quoteIdentifier(type.name)
+  if (type.kind === 'enum') {
+    const values = type.values.map((value) => dialect.quoteLiteral(value))
+    return `CREATE TYPE ${name} AS ENUM (${values.join(', ')});`
+  }
+  const parts = [
+    `CREATE DOMAIN ${name} AS ${typeSql(schema, dialect, type.base)}`,
+  ]
+  if (present(type.default)) parts.push(`DEFAULT ${type.default}`)
+  if (type.notNull) parts.push('NOT NULL')
+  return `${parts.join(' ')};`
+}
 
 function requireTable(schema: Schema, tableId: string): Table {
   const found = schema.tables.find((table) => table.id === tableId)
@@ -67,6 +127,15 @@ function foreignKeyOf(
   }
 }
 
+function createIndex(table: Table, index: Index, dialect: Dialect): string {
+  const quote = (name: string) => dialect.quoteIdentifier(name)
+  const columns = index.columns.map((id) =>
+    quote(requireColumn(table, id).name)
+  )
+  const using = index.method === 'btree' ? '' : ` USING ${index.method}`
+  return `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${quote(index.name)} ON ${quote(table.name)}${using} (${columns.join(', ')});`
+}
+
 function createTable(
   schema: Schema,
   table: Table,
@@ -86,7 +155,11 @@ function createTable(
     const generated = column.generated
       ? dialect.generatedClause(column.type)
       : null
-    return `  ${quote(column.name)} ${dialect.typeName(column.type)}${required ? ' NOT NULL' : ''}${generated ? ` ${generated}` : ''}`
+    const fallback =
+      present(column.default) && !column.generated
+        ? ` DEFAULT ${column.default}`
+        : ''
+    return `  ${quote(column.name)} ${typeSql(schema, dialect, column.type)}${required ? ' NOT NULL' : ''}${fallback}${generated ? ` ${generated}` : ''}`
   })
   if (table.primaryKey.length > 0) {
     const names = table.primaryKey.map((id) =>
@@ -172,12 +245,22 @@ export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
 
   const { planned, deferred } = planTables(schema)
   const usedNames = new Set<string>()
-  const statements: DdlStatement[] = planned.map(({ table, inline }) => ({
-    kind: 'create',
-    key: `create:${table.id}`,
-    tableId: table.id,
-    sql: createTable(schema, table, inline, dialect, usedNames),
-  }))
+  const statements: DdlStatement[] = orderTypes(schema.types ?? []).map(
+    (type) => ({
+      kind: 'type',
+      key: `type:${type.id}`,
+      typeId: type.id,
+      sql: createType(schema, type, dialect),
+    })
+  )
+  for (const { table, inline } of planned) {
+    statements.push({
+      kind: 'create',
+      key: `create:${table.id}`,
+      tableId: table.id,
+      sql: createTable(schema, table, inline, dialect, usedNames),
+    })
+  }
   for (const relationship of deferred) {
     statements.push({
       kind: 'alter',
@@ -186,6 +269,38 @@ export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
       relationshipId: relationship.id,
       sql: addForeignKey(schema, relationship, dialect, usedNames),
     })
+  }
+
+  for (const table of schema.tables) {
+    for (const index of table.indexes ?? []) {
+      statements.push({
+        kind: 'index',
+        key: `index:${index.id}`,
+        tableId: table.id,
+        indexId: index.id,
+        sql: createIndex(table, index, dialect),
+      })
+    }
+  }
+  const quote = (name: string) => dialect.quoteIdentifier(name)
+  for (const table of schema.tables) {
+    if (present(table.comment)) {
+      statements.push({
+        kind: 'comment',
+        key: `comment:table:${table.id}`,
+        tableId: table.id,
+        sql: `COMMENT ON TABLE ${quote(table.name)} IS ${dialect.quoteLiteral(table.comment)};`,
+      })
+    }
+    for (const column of table.columns) {
+      if (!present(column.comment)) continue
+      statements.push({
+        kind: 'comment',
+        key: `comment:column:${table.id}:${column.id}`,
+        tableId: table.id,
+        sql: `COMMENT ON COLUMN ${quote(table.name)}.${quote(column.name)} IS ${dialect.quoteLiteral(column.comment)};`,
+      })
+    }
   }
 
   return {

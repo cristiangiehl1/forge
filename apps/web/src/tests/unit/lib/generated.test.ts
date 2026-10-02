@@ -3,6 +3,7 @@ import { describe, it } from 'node:test'
 
 import type { Column, ColumnType } from '@forge/core'
 
+import { defaultColumnType } from '../../../lib/column-types.ts'
 import {
   impliesNotNull,
   showsGeneratedToggle,
@@ -39,7 +40,10 @@ describe('supportsGenerated', () => {
 describe('typeChangePatch', () => {
   it('keeps a generated column generated when the new type supports it', () => {
     assert.deepEqual(
-      typeChangePatch(column({ kind: 'integer' }, true), 'uuid'),
+      typeChangePatch(
+        column({ kind: 'integer' }, true),
+        defaultColumnType('uuid')
+      ),
       {
         type: { kind: 'uuid' },
       }
@@ -48,24 +52,36 @@ describe('typeChangePatch', () => {
 
   it('clears the flag when the new type cannot be generated', () => {
     assert.deepEqual(
-      typeChangePatch(column({ kind: 'integer' }, true), 'text'),
+      typeChangePatch(
+        column({ kind: 'integer' }, true),
+        defaultColumnType('text')
+      ),
       {
         type: { kind: 'text' },
         generated: false,
       }
     )
     assert.deepEqual(
-      typeChangePatch(column({ kind: 'uuid' }, true), 'varchar'),
+      typeChangePatch(
+        column({ kind: 'uuid' }, true),
+        defaultColumnType('varchar')
+      ),
       { type: { kind: 'varchar', length: 255 }, generated: false }
     )
   })
 
   it('only changes the type of a column that was not generated', () => {
-    assert.deepEqual(typeChangePatch(column({ kind: 'text' }), 'varchar'), {
-      type: { kind: 'varchar', length: 255 },
-    })
     assert.deepEqual(
-      typeChangePatch(column({ kind: 'integer' }, false), 'text'),
+      typeChangePatch(column({ kind: 'text' }), defaultColumnType('varchar')),
+      {
+        type: { kind: 'varchar', length: 255 },
+      }
+    )
+    assert.deepEqual(
+      typeChangePatch(
+        column({ kind: 'integer' }, false),
+        defaultColumnType('text')
+      ),
       {
         type: { kind: 'text' },
       }

@@ -4,32 +4,51 @@ export type { ParseError, ParseResult } from './project/parse-project.ts'
 export { parseProject } from './project/parse-project.ts'
 export type { Project } from './project/project.ts'
 export { CURRENT_FORMAT_VERSION, createProject } from './project/project.ts'
+export type { TypeUsage } from './schema/operations.ts'
 export {
   addColumn,
+  addIndex,
   addRelationship,
   addTable,
+  addType,
   createSchema,
   removeColumn,
+  removeIndex,
   removeRelationship,
   removeTable,
+  removeType,
   renameTable,
   setPrimaryKey,
+  setTableComment,
+  typeDependsOn,
+  typeUsages,
   updateColumn,
+  updateIndex,
+  updateType,
 } from './schema/operations.ts'
+export { sameTypeShape, userTypeIdsOf } from './schema/type-shape.ts'
 export type {
   Column,
   ColumnId,
   ColumnRef,
   ColumnType,
+  DomainType,
+  EnumType,
+  Index,
+  IndexId,
+  IndexMethod,
   Relationship,
   RelationshipId,
   Schema,
   SimpleColumnKind,
   Table,
   TableId,
+  TypeId,
+  UserType,
 } from './schema/types.ts'
 export {
   GENERATED_COLUMN_KINDS,
+  INDEX_METHODS,
   MAX_NUMERIC_PRECISION,
   MAX_VARCHAR_LENGTH,
   SIMPLE_COLUMN_KINDS,

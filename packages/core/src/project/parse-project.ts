@@ -1,12 +1,16 @@
 import type {
   Column,
   ColumnType,
+  Index,
+  IndexMethod,
   Relationship,
   Schema,
   SimpleColumnKind,
   Table,
+  UserType,
 } from '../schema/types.ts'
 import {
+  INDEX_METHODS,
   MAX_NUMERIC_PRECISION,
   MAX_VARCHAR_LENGTH,
   SIMPLE_COLUMN_KINDS,
@@ -45,10 +49,26 @@ function readString(
   return value
 }
 
+function readOptionalString(
+  source: Record<string, unknown>,
+  key: string,
+  path: string,
+  fail: Fail
+): string | undefined {
+  const value = source[key]
+  if (value === undefined) return undefined
+  if (typeof value !== 'string') {
+    fail(`${path}.${key}`, `"${key}" must be a string.`)
+    return undefined
+  }
+  return value
+}
+
 function parseType(
   raw: unknown,
   path: string,
-  fail: Fail
+  fail: Fail,
+  typeIds?: ReadonlySet<string>
 ): ColumnType | undefined {
   if (!isRecord(raw) || typeof raw.kind !== 'string') {
     fail(path, 'A column type must be an object with a "kind".')
@@ -87,6 +107,32 @@ function parseType(
     }
     return { kind: 'numeric', precision, scale }
   }
+  if (kind === 'char') {
+    const length = raw.length
+    if (!isInteger(length) || length < 1 || length > MAX_VARCHAR_LENGTH) {
+      fail(
+        path,
+        `char needs an integer length from 1 to ${MAX_VARCHAR_LENGTH}.`
+      )
+      return undefined
+    }
+    return { kind: 'char', length }
+  }
+  if (kind === 'array') {
+    const of = parseType(raw.of, `${path}.of`, fail, typeIds)
+    return of ? { kind: 'array', of } : undefined
+  }
+  if (kind === 'user') {
+    if (typeof raw.typeId !== 'string') {
+      fail(`${path}.typeId`, 'A user type needs a "typeId".')
+      return undefined
+    }
+    if (typeIds && !typeIds.has(raw.typeId)) {
+      fail(`${path}.typeId`, `The type "${raw.typeId}" does not exist.`)
+      return undefined
+    }
+    return { kind: 'user', typeId: raw.typeId }
+  }
   fail(path, `Unknown column type "${kind}".`)
   return undefined
 }
@@ -94,7 +140,8 @@ function parseType(
 function parseColumn(
   raw: unknown,
   path: string,
-  fail: Fail
+  fail: Fail,
+  typeIds: ReadonlySet<string>
 ): Column | undefined {
   if (!isRecord(raw)) {
     fail(path, 'A column must be an object.')
@@ -102,7 +149,9 @@ function parseColumn(
   }
   const id = readString(raw, 'id', path, fail)
   const name = readString(raw, 'name', path, fail)
-  const type = parseType(raw.type, `${path}.type`, fail)
+  const type = parseType(raw.type, `${path}.type`, fail, typeIds)
+  const comment = readOptionalString(raw, 'comment', path, fail)
+  const dflt = readOptionalString(raw, 'default', path, fail)
   const generatedIsValid =
     raw.generated === undefined || typeof raw.generated === 'boolean'
   if (!generatedIsValid) {
@@ -116,7 +165,9 @@ function parseColumn(
     id === undefined ||
     name === undefined ||
     type === undefined ||
-    !generatedIsValid
+    !generatedIsValid ||
+    (raw.comment !== undefined && comment === undefined) ||
+    (raw.default !== undefined && dflt === undefined)
   ) {
     return undefined
   }
@@ -126,10 +177,18 @@ function parseColumn(
     type,
     nullable: raw.nullable,
     ...(typeof raw.generated === 'boolean' ? { generated: raw.generated } : {}),
+    ...(dflt === undefined ? {} : { default: dflt }),
+    ...(comment === undefined ? {} : { comment }),
   }
 }
 
-function parseTable(raw: unknown, path: string, fail: Fail): Table | undefined {
+function parseTable(
+  raw: unknown,
+  path: string,
+  fail: Fail,
+  typeIds: ReadonlySet<string>,
+  indexIds: Set<string>
+): Table | undefined {
   if (!isRecord(raw)) {
     fail(path, 'A table must be an object.')
     return undefined
@@ -149,7 +208,7 @@ function parseTable(raw: unknown, path: string, fail: Fail): Table | undefined {
   const columnIds = new Set<string>()
   raw.columns.forEach((rawColumn: unknown, index: number) => {
     const columnPath = `${path}.columns[${index}]`
-    const column = parseColumn(rawColumn, columnPath, fail)
+    const column = parseColumn(rawColumn, columnPath, fail, typeIds)
     if (!column) return
     if (columnIds.has(column.id)) {
       fail(`${columnPath}.id`, `Duplicate column id "${column.id}".`)
@@ -171,8 +230,174 @@ function parseTable(raw: unknown, path: string, fail: Fail): Table | undefined {
     primaryKey.push(entry)
   })
 
+  const comment = readOptionalString(raw, 'comment', path, fail)
+  const indexes = parseIndexes(
+    raw.indexes,
+    `${path}.indexes`,
+    columnIds,
+    indexIds,
+    fail
+  )
+
   if (id === undefined || name === undefined) return undefined
-  return { id, name, columns, primaryKey }
+  return {
+    id,
+    name,
+    columns,
+    primaryKey,
+    ...(comment === undefined ? {} : { comment }),
+    ...(indexes ? { indexes } : {}),
+  }
+}
+
+function parseIndexes(
+  raw: unknown,
+  path: string,
+  columnIds: ReadonlySet<string>,
+  indexIds: Set<string>,
+  fail: Fail
+): Index[] | undefined {
+  if (raw === undefined) return undefined
+  if (!Array.isArray(raw)) {
+    fail(path, '"indexes" must be an array.')
+    return undefined
+  }
+  const indexes: Index[] = []
+  raw.forEach((rawIndex: unknown, position: number) => {
+    const indexPath = `${path}[${position}]`
+    if (!isRecord(rawIndex)) {
+      fail(indexPath, 'An index must be an object.')
+      return
+    }
+    const id = readString(rawIndex, 'id', indexPath, fail)
+    if (id !== undefined && indexIds.has(id)) {
+      fail(`${indexPath}.id`, `Duplicate index id "${id}".`)
+      return
+    }
+    if (id !== undefined) indexIds.add(id)
+    const name = readString(rawIndex, 'name', indexPath, fail)
+    const columns: string[] = []
+    if (!Array.isArray(rawIndex.columns)) {
+      fail(`${indexPath}.columns`, '"columns" must be an array.')
+    } else {
+      rawIndex.columns.forEach((entry: unknown, at: number) => {
+        if (typeof entry !== 'string' || !columnIds.has(entry)) {
+          fail(
+            `${indexPath}.columns[${at}]`,
+            'An index column must be the id of a column of the table.'
+          )
+          return
+        }
+        columns.push(entry)
+      })
+    }
+    if (typeof rawIndex.unique !== 'boolean') {
+      fail(`${indexPath}.unique`, '"unique" must be a boolean.')
+    }
+    const method = rawIndex.method
+    if (!(INDEX_METHODS as readonly unknown[]).includes(method)) {
+      fail(
+        `${indexPath}.method`,
+        `"method" must be one of ${INDEX_METHODS.join(', ')}.`
+      )
+    }
+    if (
+      id === undefined ||
+      name === undefined ||
+      typeof rawIndex.unique !== 'boolean' ||
+      !(INDEX_METHODS as readonly unknown[]).includes(method)
+    ) {
+      return
+    }
+    indexes.push({
+      id,
+      name,
+      columns,
+      unique: rawIndex.unique,
+      method: method as IndexMethod,
+    })
+  })
+  return indexes
+}
+
+function parseTypes(
+  raw: unknown,
+  path: string,
+  typeIds: ReadonlySet<string>,
+  fail: Fail
+): UserType[] | undefined {
+  if (raw === undefined) return undefined
+  if (!Array.isArray(raw)) {
+    fail(path, '"types" must be an array.')
+    return undefined
+  }
+  const types: UserType[] = []
+  const seenIds = new Set<string>()
+  raw.forEach((rawType: unknown, position: number) => {
+    const typePath = `${path}[${position}]`
+    if (!isRecord(rawType)) {
+      fail(typePath, 'A type must be an object.')
+      return
+    }
+    const id = readString(rawType, 'id', typePath, fail)
+    if (id !== undefined && seenIds.has(id)) {
+      fail(`${typePath}.id`, `Duplicate type id "${id}".`)
+      return
+    }
+    if (id !== undefined) seenIds.add(id)
+    const name = readString(rawType, 'name', typePath, fail)
+    if (rawType.kind === 'enum') {
+      if (!Array.isArray(rawType.values)) {
+        fail(`${typePath}.values`, '"values" must be an array.')
+        return
+      }
+      const values: string[] = []
+      let valuesAreValid = true
+      rawType.values.forEach((value: unknown, at: number) => {
+        if (typeof value !== 'string') {
+          fail(`${typePath}.values[${at}]`, 'An enum value must be a string.')
+          valuesAreValid = false
+          return
+        }
+        values.push(value)
+      })
+      if (id === undefined || name === undefined || !valuesAreValid) return
+      types.push({ kind: 'enum', id, name, values })
+      return
+    }
+    if (rawType.kind === 'domain') {
+      const base = parseType(rawType.base, `${typePath}.base`, fail, typeIds)
+      const dflt = readOptionalString(rawType, 'default', typePath, fail)
+      if (
+        rawType.notNull !== undefined &&
+        typeof rawType.notNull !== 'boolean'
+      ) {
+        fail(`${typePath}.notNull`, '"notNull" must be a boolean.')
+        return
+      }
+      if (
+        id === undefined ||
+        name === undefined ||
+        !base ||
+        (rawType.default !== undefined && dflt === undefined)
+      ) {
+        return
+      }
+      types.push({
+        kind: 'domain',
+        id,
+        name,
+        base,
+        ...(typeof rawType.notNull === 'boolean'
+          ? { notNull: rawType.notNull }
+          : {}),
+        ...(dflt === undefined ? {} : { default: dflt }),
+      })
+      return
+    }
+    fail(`${typePath}.kind`, 'A type must be an "enum" or a "domain".')
+  })
+  return types
 }
 
 function parseColumnRef(
@@ -223,11 +448,22 @@ function parseSchema(
     return undefined
   }
 
+  const typeIds = new Set<string>()
+  if (Array.isArray(raw.types)) {
+    for (const rawType of raw.types) {
+      if (isRecord(rawType) && typeof rawType.id === 'string') {
+        typeIds.add(rawType.id)
+      }
+    }
+  }
+  const types = parseTypes(raw.types, `${path}.types`, typeIds, fail)
+
+  const indexIds = new Set<string>()
   const tables: Table[] = []
   const tableIds = new Set<string>()
   raw.tables.forEach((rawTable: unknown, index: number) => {
     const tablePath = `${path}.tables[${index}]`
-    const table = parseTable(rawTable, tablePath, fail)
+    const table = parseTable(rawTable, tablePath, fail, typeIds, indexIds)
     if (!table) return
     if (tableIds.has(table.id)) {
       fail(`${tablePath}.id`, `Duplicate table id "${table.id}".`)
@@ -267,7 +503,12 @@ function parseSchema(
     relationships.push({ id, from, to })
   })
 
-  return { version: 1, tables, relationships }
+  return {
+    version: 1,
+    tables,
+    relationships,
+    ...(types ? { types } : {}),
+  }
 }
 
 export function parseProject(input: unknown): ParseResult {

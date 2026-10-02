@@ -97,9 +97,13 @@ test.describe('layout, routing and hover', () => {
 
     await expect(page.locator('.table-node--hovered')).toHaveCount(1)
     await expect(page.locator('.react-flow__edge.related')).toHaveCount(3)
+    // The table's own statements light up: its CREATE TABLE, its two indexes
+    // and the comment on its total column.
     const active = page.locator('.ddl-active')
-    await expect(active).toHaveCount(1)
-    await expect(active).toContainText('CREATE TABLE "orders"')
+    await expect(active).toHaveCount(4)
+    await expect(
+      active.filter({ hasText: 'CREATE TABLE "orders"' })
+    ).toHaveCount(1)
 
     await page.mouse.move(5, 300)
     await expect(page.locator('.table-node--hovered')).toHaveCount(0)

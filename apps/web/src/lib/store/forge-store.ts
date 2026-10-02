@@ -2,11 +2,16 @@ import type {
   Column,
   ColumnId,
   ColumnRef,
+  Index,
+  IndexId,
   Issue,
   ParseError,
   RelationshipId,
   Schema,
   TableId,
+  TypeId,
+  TypeUsage,
+  UserType,
 } from '@forge/core'
 import * as core from '@forge/core'
 import { createStore } from 'zustand/vanilla'
@@ -69,6 +74,21 @@ export interface ForgeState {
   ) => void
   removeColumn: (tableId: TableId, columnId: ColumnId) => void
   setPrimaryKey: (tableId: TableId, columnIds: ColumnId[]) => void
+  setTableComment: (tableId: TableId, comment: string) => void
+
+  /** Starts on the table's first column; null when the table has none. */
+  addIndex: (tableId: TableId) => IndexId | null
+  updateIndex: (
+    tableId: TableId,
+    indexId: IndexId,
+    patch: Partial<Omit<Index, 'id'>>
+  ) => void
+  removeIndex: (tableId: TableId, indexId: IndexId) => void
+
+  addType: (kind: 'enum' | 'domain') => TypeId
+  updateType: (type: UserType) => void
+  /** Empty when removed; what still uses the type, with nothing changed, otherwise. */
+  removeType: (typeId: TypeId) => TypeUsage[]
 
   connect: (from: ColumnRef, to: ColumnRef) => Issue | null
   removeRelationship: (relationshipId: RelationshipId) => void
@@ -105,6 +125,14 @@ function firstFreeName(prefix: string, taken: string[]): string {
   let attempt = 1
   while (taken.includes(`${prefix}_${attempt}`)) attempt++
   return `${prefix}_${attempt}`
+}
+
+/** `base`, or `base_2`, `base_3`… until it is not taken. */
+function freeName(base: string, taken: string[]): string {
+  if (!taken.includes(base)) return base
+  let attempt = 2
+  while (taken.includes(`${base}_${attempt}`)) attempt++
+  return `${base}_${attempt}`
 }
 
 export function createForgeStore({ newId }: ForgeStoreDeps) {
@@ -288,6 +316,59 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
 
     setPrimaryKey: (tableId, columnIds) =>
       set({ schema: core.setPrimaryKey(get().schema, tableId, columnIds) }),
+
+    setTableComment: (tableId, comment) =>
+      set({ schema: core.setTableComment(get().schema, tableId, comment) }),
+
+    addIndex: (tableId) => {
+      const { schema } = get()
+      const table = schema.tables.find((candidate) => candidate.id === tableId)
+      const first = table?.columns[0]
+      if (!table || !first) return null
+      const taken = schema.tables.flatMap((candidate) =>
+        (candidate.indexes ?? []).map((index) => index.name)
+      )
+      const id = newId()
+      const index: Index = {
+        id,
+        name: freeName(`idx_${table.name}_${first.name}`, taken),
+        columns: [first.id],
+        unique: false,
+        method: 'btree',
+      }
+      set({ schema: core.addIndex(schema, tableId, index) })
+      return id
+    },
+
+    updateIndex: (tableId, indexId, patch) =>
+      set({ schema: core.updateIndex(get().schema, tableId, indexId, patch) }),
+
+    removeIndex: (tableId, indexId) =>
+      set({ schema: core.removeIndex(get().schema, tableId, indexId) }),
+
+    addType: (kind) => {
+      const { schema } = get()
+      const id = newId()
+      const name = firstFreeName(
+        'type',
+        (schema.types ?? []).map((type) => type.name)
+      )
+      const type: UserType =
+        kind === 'enum'
+          ? { kind: 'enum', id, name, values: ['value_1'] }
+          : { kind: 'domain', id, name, base: { kind: 'text' } }
+      set({ schema: core.addType(schema, type) })
+      return id
+    },
+
+    updateType: (type) => set({ schema: core.updateType(get().schema, type) }),
+
+    removeType: (typeId) => {
+      const usages = core.typeUsages(get().schema, typeId)
+      if (usages.length > 0) return usages
+      set({ schema: core.removeType(get().schema, typeId) })
+      return []
+    },
 
     connect: (from, to) => {
       const { schema } = get()
