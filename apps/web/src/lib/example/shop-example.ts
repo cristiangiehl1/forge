@@ -1,17 +1,15 @@
 import type { ColumnType, Schema } from '@forge/core'
 import * as core from '@forge/core'
 
+import { layoutTables } from '../layout/layout-tables.ts'
 import type { ProjectView } from '../project-view.ts'
 import { createView } from '../project-view.ts'
 
 /**
  * A small online shop to look at: seven tables and eight foreign keys, built with
  * the core's own operations, so it is exactly what a person could have drawn.
- * Ids are fixed, which keeps it deterministic and easy to test.
- *
- *   users        addresses    categories
- *   orders       order_items  products
- *                             reviews
+ * Ids are fixed, which keeps it deterministic and easy to test. Where the tables sit
+ * is not stored here: `layoutTables` works it out from the relationships.
  */
 interface ColumnDef {
   name: string
@@ -23,7 +21,6 @@ interface ColumnDef {
 
 interface TableDef {
   name: string
-  at: { x: number; y: number }
   columns: ColumnDef[]
 }
 
@@ -46,7 +43,6 @@ const id = (): ColumnDef => ({
 const TABLES: TableDef[] = [
   {
     name: 'users',
-    at: { x: 40, y: 40 },
     columns: [
       id(),
       { name: 'name', type: varchar(120), notNull: true },
@@ -56,7 +52,6 @@ const TABLES: TableDef[] = [
   },
   {
     name: 'addresses',
-    at: { x: 360, y: 40 },
     columns: [
       id(),
       { name: 'user_id', type: integer, notNull: true },
@@ -67,12 +62,10 @@ const TABLES: TableDef[] = [
   },
   {
     name: 'categories',
-    at: { x: 680, y: 40 },
     columns: [id(), { name: 'name', type: varchar(80), notNull: true }],
   },
   {
     name: 'orders',
-    at: { x: 40, y: 300 },
     columns: [
       id(),
       { name: 'user_id', type: integer, notNull: true },
@@ -84,7 +77,6 @@ const TABLES: TableDef[] = [
   },
   {
     name: 'order_items',
-    at: { x: 360, y: 300 },
     columns: [
       { name: 'order_id', type: integer, primaryKey: true },
       { name: 'product_id', type: integer, primaryKey: true },
@@ -94,7 +86,6 @@ const TABLES: TableDef[] = [
   },
   {
     name: 'products',
-    at: { x: 680, y: 300 },
     columns: [
       id(),
       { name: 'category_id', type: integer },
@@ -105,7 +96,6 @@ const TABLES: TableDef[] = [
   },
   {
     name: 'reviews',
-    at: { x: 680, y: 560 },
     columns: [
       id(),
       { name: 'product_id', type: integer, notNull: true },
@@ -133,8 +123,6 @@ const columnId = (table: string, column: string) => `ex-c-${table}-${column}`
 
 export function createShopExample(): { schema: Schema; view: ProjectView } {
   let schema = core.createSchema()
-  const view = createView()
-  const nodes: ProjectView['nodes'] = {}
 
   for (const table of TABLES) {
     schema = core.addTable(schema, {
@@ -157,7 +145,6 @@ export function createShopExample(): { schema: Schema; view: ProjectView } {
         .filter((column) => column.primaryKey)
         .map((column) => columnId(table.name, column.name))
     )
-    nodes[tableId(table.name)] = table.at
   }
 
   for (const [from, column, to] of FOREIGN_KEYS) {
@@ -168,5 +155,5 @@ export function createShopExample(): { schema: Schema; view: ProjectView } {
     })
   }
 
-  return { schema, view: { ...view, nodes } }
+  return { schema, view: { ...createView(), nodes: layoutTables(schema) } }
 }

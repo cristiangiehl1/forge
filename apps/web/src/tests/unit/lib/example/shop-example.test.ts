@@ -91,3 +91,17 @@ describe('createShopExample', () => {
     assert.deepEqual(parsed.project.schema, schema)
   })
 })
+
+describe('the layout of the example', () => {
+  it('puts every referenced table to the left of the tables that reference it', () => {
+    const { schema, view } = createShopExample()
+    for (const relationship of schema.relationships) {
+      const child = view.nodes[relationship.from.tableId]
+      const parent = view.nodes[relationship.to.tableId]
+      assert.ok(
+        (parent?.x ?? 0) < (child?.x ?? 0),
+        `${relationship.id}: the parent is not on the left`
+      )
+    }
+  })
+})

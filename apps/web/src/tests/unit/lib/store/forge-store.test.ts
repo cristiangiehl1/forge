@@ -610,3 +610,102 @@ describe('loadExample', () => {
     assert.equal(new Set(tables.map((t) => t.name)).size, tables.length)
   })
 })
+
+describe('hovering a table', () => {
+  it('starts with nothing hovered, and follows hoverTable', () => {
+    const store = makeStore()
+    assert.equal(store.getState().hoveredTable, null)
+    const table = store.getState().addTable()
+    store.getState().hoverTable(table)
+    assert.equal(store.getState().hoveredTable, table)
+    store.getState().hoverTable(null)
+    assert.equal(store.getState().hoveredTable, null)
+  })
+
+  it('is forgotten when the hovered table is removed, and kept for another table', () => {
+    const store = makeStore()
+    const first = store.getState().addTable()
+    const second = store.getState().addTable()
+    store.getState().hoverTable(second)
+    store.getState().removeTable(first)
+    assert.equal(store.getState().hoveredTable, second)
+    store.getState().removeTable(second)
+    assert.equal(store.getState().hoveredTable, null)
+  })
+
+  it('is forgotten whenever a project is loaded, restarted or replaced by the example', () => {
+    for (const reset of [
+      (s: TestStore) => s.getState().hydrate({ status: 'empty' }),
+      (s: TestStore) => s.getState().startNewProject(),
+      (s: TestStore) => s.getState().loadExample(),
+    ]) {
+      const store = makeStore()
+      store.getState().hoverTable(store.getState().addTable())
+      reset(store)
+      assert.equal(store.getState().hoveredTable, null)
+    }
+  })
+
+  it('is not touched by editing', () => {
+    const store = makeStore()
+    const table = store.getState().addTable()
+    store.getState().hoverTable(table)
+    store.getState().renameTable(table, 'renamed')
+    store.getState().addColumn(table)
+    assert.equal(store.getState().hoveredTable, table)
+  })
+})
+
+describe('autoLayout', () => {
+  function related() {
+    const store = makeStore()
+    const { users, usersId, orders, ordersUser } = withUsersAndOrders(store)
+    store
+      .getState()
+      .connect(
+        { tableId: orders, columnId: ordersUser },
+        { tableId: users, columnId: usersId }
+      )
+    return { store, users, orders }
+  }
+
+  it('puts the referenced table to the left of the table that references it', () => {
+    const { store, users, orders } = related()
+    store.getState().moveNode(users, { x: 900, y: 500 })
+    store.getState().moveNode(orders, { x: 0, y: 0 })
+    store.getState().autoLayout()
+    const nodes = store.getState().view.nodes
+    assert.ok((nodes[users]?.x ?? 0) < (nodes[orders]?.x ?? 0))
+  })
+
+  it('moves tables only: the schema and the selection stay as they are', () => {
+    const { store, users } = related()
+    store.getState().select(users)
+    const schema = store.getState().schema
+    store.getState().autoLayout()
+    assert.equal(store.getState().schema, schema)
+    assert.equal(store.getState().selection, users)
+  })
+
+  it('asks the canvas to fit what it laid out', () => {
+    const { store } = related()
+    const before = store.getState().fitRequest
+    store.getState().autoLayout()
+    assert.equal(store.getState().fitRequest, before + 1)
+  })
+
+  it('does nothing for a project without tables', () => {
+    const store = makeStore()
+    const before = store.getState()
+    store.getState().autoLayout()
+    assert.equal(store.getState().view, before.view)
+    assert.equal(store.getState().fitRequest, before.fitRequest)
+  })
+
+  it('also fits the canvas when the example is loaded', () => {
+    const store = makeStore()
+    const before = store.getState().fitRequest
+    store.getState().loadExample()
+    assert.equal(store.getState().fitRequest, before + 1)
+  })
+})

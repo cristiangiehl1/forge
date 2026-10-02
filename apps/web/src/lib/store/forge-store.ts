@@ -13,6 +13,7 @@ import { createStore } from 'zustand/vanilla'
 
 import type { LoadResult } from '../../queries/project/load-project.ts'
 import { createShopExample } from '../example/shop-example.ts'
+import { layoutTables } from '../layout/layout-tables.ts'
 import type { NodePosition, ProjectView, Viewport } from '../project-view.ts'
 import {
   createView,
@@ -36,6 +37,10 @@ export interface ForgeState {
   selection: TableId | null
   /** At most one of `selection` and `relationshipSelection` is set. */
   relationshipSelection: RelationshipId | null
+  /** The table the pointer is over: it is highlighted, and so is its part of the script. */
+  hoveredTable: TableId | null
+  /** Moves on when a layout was applied and the canvas should zoom to fit it. */
+  fitRequest: number
   /** App preferences: they outlive any one project. */
   settings: AppSettings
   /** Moves on whenever a project is loaded or restarted, never while editing. */
@@ -70,6 +75,9 @@ export interface ForgeState {
   moveNode: (tableId: TableId, position: NodePosition) => void
   setViewport: (viewport: Viewport) => void
   select: (tableId: TableId | null) => void
+  hoverTable: (tableId: TableId | null) => void
+  /** Moves every table to where its relationships say it belongs. */
+  autoLayout: () => void
   selectRelationship: (relationshipId: RelationshipId | null) => void
   clearSelection: () => void
 }
@@ -84,6 +92,7 @@ const emptyProject = () => ({
   view: createView(),
   selection: null,
   relationshipSelection: null,
+  hoveredTable: null,
 })
 
 /** A relationship selection survives only while that relationship exists. */
@@ -102,6 +111,7 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
     ...emptyProject(),
     settings: DEFAULT_SETTINGS,
     projectEpoch: 0,
+    fitRequest: 0,
     hydrated: false,
     persistence: 'ready',
     notice: null,
@@ -122,6 +132,7 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
             ),
             selection: null,
             relationshipSelection: null,
+            hoveredTable: null,
             hydrated: true,
             persistence: 'ready',
             notice: null,
@@ -163,9 +174,11 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
         view,
         selection: null,
         relationshipSelection: null,
+        hoveredTable: null,
         persistence: 'ready',
         notice: null,
         projectEpoch: get().projectEpoch + 1,
+        fitRequest: get().fitRequest + 1,
       })
     },
 
@@ -214,7 +227,8 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
       set({ schema: core.renameTable(get().schema, tableId, name) }),
 
     removeTable: (tableId) => {
-      const { schema, view, selection, relationshipSelection } = get()
+      const { schema, view, selection, relationshipSelection, hoveredTable } =
+        get()
       if (!schema.tables.some((table) => table.id === tableId)) return
       const { [tableId]: _removed, ...nodes } = view.nodes
       const next = core.removeTable(schema, tableId)
@@ -222,6 +236,7 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
         schema: next,
         view: { ...view, nodes },
         selection: selection === tableId ? null : selection,
+        hoveredTable: hoveredTable === tableId ? null : hoveredTable,
         relationshipSelection: stillSelected(next, relationshipSelection),
       })
     },
@@ -302,6 +317,17 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
           ? { relationshipSelection: null }
           : { relationshipSelection: relationshipId, selection: null }
       ),
+
+    hoverTable: (tableId) => set({ hoveredTable: tableId }),
+
+    autoLayout: () => {
+      const { schema, view } = get()
+      if (schema.tables.length === 0) return
+      set({
+        view: { ...view, nodes: layoutTables(schema) },
+        fitRequest: get().fitRequest + 1,
+      })
+    },
 
     clearSelection: () => set({ selection: null, relationshipSelection: null }),
   }))
