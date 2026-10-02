@@ -56,7 +56,7 @@ export function DdlPanel() {
                 ? 'Copy failed'
                 : 'Copy'}
           </button>
-          <pre className={hoveredTable ? 'ddl--focus' : undefined}>
+          <pre>
             <code>
               {result.statements.map((statement, index) => (
                 <Fragment key={statement.key}>

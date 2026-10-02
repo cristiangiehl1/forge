@@ -312,18 +312,16 @@ button {
   stroke-width: 3px;
 }
 
-/* The hovered table's statement is a spotlight, not a text selection: the rest
-   of the script dims and the statement gets an accent bar down its left side. */
-.ddl-panel pre.ddl--focus span[data-table] {
-  opacity: 0.4;
-  transition: opacity 120ms;
+/* The hovered table's statement is marked by an accent bar down its left side,
+   in the gutter; the text is left alone, so it never looks like a selection. */
+.ddl-panel pre {
+  padding-left: 14px;
 }
 
-.ddl-panel pre.ddl--focus .ddl-active {
-  opacity: 1;
+.ddl-active {
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
   padding-left: 10px;
-  margin-left: -13px;
-  box-shadow: inset 3px 0 0 var(--accent);
+  margin-left: -10px;
+  box-shadow: inset 4px 0 0 var(--accent);
 }
