@@ -53,3 +53,5 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 **Step**: what one undo reverts: one click on a button, one drag of a table, or a run of edits to the same field with pauses shorter than a second (typing a name). Loading the example and importing a script are steps too; undoing them also fits the canvas.
 
 **Undo / Redo**: the toolbar buttons and Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z and Ctrl+Y. They keep the zoom, clear a selection or hover that points at something that is gone, and work in the Inspector's fields; inside a dialog the browser's own undo applies.
+
+**Download .sql**: the DDL panel's button next to Copy. It saves the very script the panel shows, as `forge-schema.sql` (UTF-8), through a temporary link released at once. It is not shown when the project is empty or when the schema has problems, like Copy.

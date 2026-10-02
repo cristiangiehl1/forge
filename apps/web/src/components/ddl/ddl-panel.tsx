@@ -2,6 +2,7 @@ import { generateDdl, postgres } from '@forge/core'
 import { useEffect, useRef, useState } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
+import { saveFile, sqlFile } from '../../lib/download/sql-file.ts'
 
 type CopyState = 'idle' | 'copied' | 'failed'
 
@@ -61,6 +62,9 @@ export function DdlPanel() {
               : copyState === 'failed'
                 ? 'Copy failed'
                 : 'Copy'}
+          </button>
+          <button type='button' onClick={() => saveFile(sqlFile(result.sql))}>
+            Download .sql
           </button>
           <pre>
             <code>
