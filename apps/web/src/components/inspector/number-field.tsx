@@ -24,6 +24,15 @@ export function NumberField({
   onCommit,
 }: NumberFieldProps) {
   const [draft, setDraft] = useState<string | null>(null)
+  // A value that changed from outside (an undo, another edit) replaces what is
+  // being typed, so the field never disagrees with the rest of the screen. A
+  // value this field committed itself does not: the user is still typing.
+  const [shown, setShown] = useState(value)
+  const [committed, setCommitted] = useState<number | null>(null)
+  if (value !== shown) {
+    setShown(value)
+    if (value !== committed) setDraft(null)
+  }
 
   return (
     <input
@@ -35,12 +44,16 @@ export function NumberField({
       onChange={(event) => {
         setDraft(event.target.value)
         const parsed = parseDraft(event.target.value, min, max)
-        if (parsed !== null) onCommit(parsed)
+        if (parsed !== null) {
+          setCommitted(parsed)
+          onCommit(parsed)
+        }
       }}
       onBlur={(event) => {
         const text = event.target.value.trim()
         // A whole number outside the range: commit it and let the setter clamp.
         if (/^-?\d+$/.test(text) && parseDraft(text, min, max) === null) {
+          setCommitted(Number(text))
           onCommit(Number(text))
         }
         setDraft(null)

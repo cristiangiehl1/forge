@@ -145,6 +145,31 @@ function firstFreeName(prefix: string, taken: string[]): string {
   return `${prefix}_${attempt}`
 }
 
+/**
+ * The grouping key of an edit made by typing: `prefix` plus the fields it
+ * touches. A click (a checkbox, a choice of columns) is never grouped, or two
+ * quick clicks would be one step that cancels itself out.
+ */
+function typingKey(prefix: string, patch: object): string | null {
+  const values = Object.values(patch)
+  if (
+    values.some((value) => typeof value === 'boolean' || Array.isArray(value))
+  ) {
+    return null
+  }
+  return `${prefix}:${Object.keys(patch).sort().join(',')}`
+}
+
+/** The fields of an updated type that differ from the stored one. */
+function changedFields(before: object | undefined, after: object): string {
+  const old = (before ?? {}) as Record<string, unknown>
+  return Object.entries(after)
+    .filter(([key, value]) => !Object.is(old[key], value))
+    .map(([key]) => key)
+    .sort()
+    .join(',')
+}
+
 /** `base`, or `base_2`, `base_3`… until it is not taken. */
 function freeName(base: string, taken: string[]): string {
   if (!taken.includes(base)) return base
@@ -430,12 +455,9 @@ export function createForgeStore({ newId, now = Date.now }: ForgeStoreDeps) {
       },
 
       updateColumn: (tableId, columnId, patch) =>
-        edit(
-          `column:${tableId}:${columnId}:${Object.keys(patch).sort().join(',')}`,
-          {
-            schema: core.updateColumn(get().schema, tableId, columnId, patch),
-          }
-        ),
+        edit(typingKey(`column:${tableId}:${columnId}`, patch), {
+          schema: core.updateColumn(get().schema, tableId, columnId, patch),
+        }),
 
       removeColumn: (tableId, columnId) => {
         const next = core.removeColumn(get().schema, tableId, columnId)
@@ -516,12 +538,9 @@ export function createForgeStore({ newId, now = Date.now }: ForgeStoreDeps) {
             applied = { ...patch, name: freeName(renamed, taken) }
           }
         }
-        edit(
-          `index:${tableId}:${indexId}:${Object.keys(patch).sort().join(',')}`,
-          {
-            schema: core.updateIndex(schema, tableId, indexId, applied),
-          }
-        )
+        edit(typingKey(`index:${tableId}:${indexId}`, patch), {
+          schema: core.updateIndex(schema, tableId, indexId, applied),
+        })
       },
 
       removeIndex: (tableId, indexId) =>
@@ -544,10 +563,12 @@ export function createForgeStore({ newId, now = Date.now }: ForgeStoreDeps) {
         return id
       },
 
-      updateType: (type) =>
-        edit(`type:${type.id}`, {
+      updateType: (type) => {
+        const stored = get().schema.types?.find((t) => t.id === type.id)
+        edit(`type:${type.id}:${changedFields(stored, type)}`, {
           schema: core.updateType(get().schema, type),
-        }),
+        })
+      },
 
       removeType: (typeId) => {
         const usages = core.typeUsages(get().schema, typeId)
@@ -579,6 +600,10 @@ export function createForgeStore({ newId, now = Date.now }: ForgeStoreDeps) {
 
       moveNode: (tableId, position) => {
         const { view } = get()
+        const there = view.nodes[tableId]
+        // React Flow reports the last position again when a drag ends: after a
+        // pause that would be a step that changes nothing.
+        if (there && there.x === position.x && there.y === position.y) return
         edit(`move:${tableId}`, {
           view: { ...view, nodes: { ...view.nodes, [tableId]: position } },
         })

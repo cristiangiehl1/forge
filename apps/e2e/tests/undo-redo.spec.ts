@@ -150,4 +150,22 @@ test.describe('undo and redo', () => {
     await undo(page).click()
     await expect(editor.tables()).toHaveCount(1)
   })
+
+  test('undoing while a number field is focused shows the undone value in it at once', async ({
+    page,
+  }) => {
+    const editor = await start(page)
+    await editor.defineTable('t', [{ name: 'name', type: 'varchar' }])
+    const length = page.getByRole('spinbutton', { name: 'Length' })
+    // Past the window that groups choosing the type with typing its length.
+    await page.waitForTimeout(1100)
+    await length.fill('3')
+    // Read the node, not the DDL panel: opening the panel would take the focus
+    // out of the field, and the point is to undo while it still has it.
+    await expect(editor.node('t')).toContainText('varchar(3)')
+    await expect(length).toBeFocused()
+    await page.keyboard.press('Control+z')
+    await expect(editor.node('t')).toContainText('varchar(255)')
+    await expect(length).toHaveValue('255')
+  })
 })

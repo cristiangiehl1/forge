@@ -138,13 +138,77 @@ describe('grouping', () => {
 
   it('an edit that changes nothing is not a step', () => {
     const { store } = setup()
-    store.getState().addTable()
-    store.getState().undo()
-    store.getState().redo()
     store.getState().removeTable('nope')
     store.getState().setPrimaryKey('nope', [])
+    store.getState().updateColumn('nope', 'nope', { name: 'x' })
+    assert.equal(store.getState().history.past.length, 0)
+  })
+
+  it('moving a table to where it already is is not a step, even after a pause', () => {
+    const { store, tick } = setup()
+    const id = store.getState().addTable()
+    tick(5000)
+    const start = store.getState().view.nodes[id]
+    for (let i = 1; i <= 5; i++) {
+      store.getState().moveNode(id, { x: i * 10, y: i * 10 })
+      tick(16)
+    }
+    // The user holds the table still, then lets go: React Flow reports the same position.
+    tick(1300)
+    store.getState().moveNode(id, { x: 50, y: 50 })
     store.getState().undo()
-    assert.equal(store.getState().schema.tables.length, 0)
+    assert.deepEqual(store.getState().view.nodes[id], start)
+  })
+
+  it('two fields of a type, edited within a second, are two steps', () => {
+    const { store, tick } = setup()
+    const id = store.getState().addType('enum')
+    tick(5000)
+    store
+      .getState()
+      .updateType({ kind: 'enum', id, name: 'mood', values: ['value_1'] })
+    tick(300)
+    store
+      .getState()
+      .updateType({ kind: 'enum', id, name: 'mood', values: ['a', 'b'] })
+    store.getState().undo()
+    assert.equal(store.getState().schema.types?.[0]?.name, 'mood')
+    const restored = store.getState().schema.types?.[0]
+    assert.ok(restored?.kind === 'enum')
+    assert.deepEqual(restored.values, ['value_1'])
+    store.getState().undo()
+    assert.equal(store.getState().schema.types?.[0]?.name, 'type_1')
+  })
+
+  it('toggling a checkbox twice in a row is two steps, so each undo changes something', () => {
+    const { store, tick } = setup()
+    const t = store.getState().addTable()
+    const c = store.getState().addColumn(t)
+    assert.ok(c)
+    tick(5000)
+    store.getState().updateColumn(t, c, { nullable: false })
+    tick(100)
+    store.getState().updateColumn(t, c, { nullable: true })
+    store.getState().undo()
+    assert.equal(store.getState().schema.tables[0]?.columns[0]?.nullable, false)
+    store.getState().undo()
+    assert.equal(store.getState().schema.tables[0]?.columns[0]?.nullable, true)
+    assert.equal(store.getState().history.past.length, 2)
+  })
+
+  it('toggling Unique, or an index column, twice is two steps too', () => {
+    const { store, tick } = setup()
+    const t = store.getState().addTable()
+    const c = store.getState().addColumn(t)
+    assert.ok(c)
+    const i = store.getState().addIndex(t)
+    assert.ok(i)
+    tick(5000)
+    store.getState().updateIndex(t, i, { unique: true })
+    tick(100)
+    store.getState().updateIndex(t, i, { unique: false })
+    store.getState().undo()
+    assert.equal(store.getState().schema.tables[0]?.indexes?.[0]?.unique, true)
   })
 })
 
