@@ -5,6 +5,7 @@ export type {
   DialectOptions,
 } from './dialects/dialect.ts'
 export { DIALECT_IDS } from './dialects/dialect.ts'
+export { oracle } from './dialects/oracle.ts'
 export { postgres } from './dialects/postgres.ts'
 export type { ParseError, ParseResult } from './project/parse-project.ts'
 export { parseProject } from './project/parse-project.ts'

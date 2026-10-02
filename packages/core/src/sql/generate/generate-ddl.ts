@@ -3,8 +3,6 @@ import { typeSql } from '../../dialects/type-sql.ts'
 import { userTypeIdsOf } from '../../schema/type-shape.ts'
 import type {
   Column,
-  ColumnType,
-  Index,
   Relationship,
   Schema,
   Table,
