@@ -557,3 +557,56 @@ describe('column names', () => {
     )
   })
 })
+
+describe('loadExample', () => {
+  it('replaces the project with the example, positions included', () => {
+    const store = makeStore()
+    store.getState().addTable()
+    store.getState().loadExample()
+    const { schema, view } = store.getState()
+    assert.ok(schema.tables.length >= 6)
+    assert.ok(schema.relationships.length >= 2)
+    assert.equal(Object.keys(view.nodes).length, schema.tables.length)
+  })
+
+  it('clears the selections and moves on to a fresh canvas', () => {
+    const store = makeStore()
+    const table = store.getState().addTable()
+    store.getState().select(table)
+    const epoch = store.getState().projectEpoch
+    store.getState().loadExample()
+    assert.equal(store.getState().selection, null)
+    assert.equal(store.getState().relationshipSelection, null)
+    assert.equal(store.getState().projectEpoch, epoch + 1)
+  })
+
+  it('also lifts a block caused by an unreadable stored project', () => {
+    const store = makeStore()
+    store.getState().hydrate({
+      status: 'invalid',
+      errors: [{ path: '', message: 'broken' }],
+    })
+    assert.equal(store.getState().persistence, 'blocked')
+    store.getState().loadExample()
+    assert.equal(store.getState().persistence, 'ready')
+    assert.equal(store.getState().notice, null)
+  })
+
+  it('leaves the settings alone', () => {
+    const store = makeStore()
+    store.getState().setNewTableId('uuid')
+    store.getState().loadExample()
+    assert.equal(store.getState().settings.newTableId, 'uuid')
+  })
+
+  it('tables created afterwards get fresh names and ids next to the example', () => {
+    const store = makeStore()
+    store.getState().loadExample()
+    const before = store.getState().schema.tables.length
+    store.getState().addTable()
+    const tables = store.getState().schema.tables
+    assert.equal(tables.length, before + 1)
+    assert.equal(new Set(tables.map((t) => t.id)).size, tables.length)
+    assert.equal(new Set(tables.map((t) => t.name)).size, tables.length)
+  })
+})

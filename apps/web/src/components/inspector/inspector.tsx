@@ -16,7 +16,7 @@ import {
 } from '../../lib/generated.ts'
 import { nextPrimaryKey } from '../../lib/primary-key.ts'
 import { relationshipsOf } from '../../lib/relationships.ts'
-import { DeleteTableButton } from './delete-table-button.tsx'
+import { ConfirmButton } from '../confirm-button.tsx'
 import { NumberField } from './number-field.tsx'
 
 function ColumnRow({ table, column }: { table: Table; column: Column }) {
@@ -153,7 +153,8 @@ export function Inspector() {
     return (
       <aside className='inspector'>
         <p className='inspector__hint'>
-          Select a table to edit it, or add a new one from the toolbar.
+          Select a table to edit it, or add a new one from the toolbar. To look
+          around first, load the example project.
         </p>
       </aside>
     )
@@ -204,8 +205,11 @@ export function Inspector() {
         <button type='button' onClick={() => addColumn(table.id)}>
           Add column
         </button>
-        <DeleteTableButton
+        <ConfirmButton
           key={table.id}
+          className='danger'
+          label='Delete table'
+          armedLabel='Click again to delete'
           onConfirm={() => removeTable(table.id)}
         />
       </div>

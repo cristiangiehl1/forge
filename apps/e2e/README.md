@@ -29,6 +29,7 @@ The first time on a machine, install the browser once:
 | `tests/editing.spec.ts` | New tables, every column type, varchar and numeric parameters, primary keys, deleting tables and columns. |
 | `tests/relationships.spec.ts` | Creating relationships by dragging, the refusals (same source column, different types, target not a primary key), selecting a relationship by clicking its line, removing it (button, Delete key, inspector), and that Backspace with a table selected deletes nothing. |
 | `tests/new-table-id.spec.ts` | The "New tables start with" preference (integer, uuid, none), that it survives a reload and a new project, and the Auto-generate toggle on a column. |
+| `tests/example.spec.ts` | The "Load example" button: seven tables and eight foreign keys, the confirmation before replacing a project, saving and editing it. Saves `screenshots/example-project.png`. |
 | `tests/ddl.spec.ts` | The DDL panel: empty project, empty table, quoted names, invalid schema, the full shop. |
 | `tests/persistence.spec.ts` | Reload restores everything, an unreadable or newer stored project is reported and left untouched, blocked browser storage. |
 

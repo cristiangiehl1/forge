@@ -12,6 +12,7 @@ import * as core from '@forge/core'
 import { createStore } from 'zustand/vanilla'
 
 import type { LoadResult } from '../../queries/project/load-project.ts'
+import { createShopExample } from '../example/shop-example.ts'
 import type { NodePosition, ProjectView, Viewport } from '../project-view.ts'
 import {
   createView,
@@ -47,6 +48,8 @@ export interface ForgeState {
   hydrateSettings: (settings: AppSettings) => void
   setNewTableId: (newTableId: NewTableId) => void
   startNewProject: () => void
+  /** Replaces the project with a ready-made example to look at. */
+  loadExample: () => void
 
   addTable: () => TableId
   renameTable: (tableId: TableId, name: string) => void
@@ -151,6 +154,19 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
           break
       }
       set({ projectEpoch: get().projectEpoch + 1 })
+    },
+
+    loadExample: () => {
+      const { schema, view } = createShopExample()
+      set({
+        schema,
+        view,
+        selection: null,
+        relationshipSelection: null,
+        persistence: 'ready',
+        notice: null,
+        projectEpoch: get().projectEpoch + 1,
+      })
     },
 
     startNewProject: () =>

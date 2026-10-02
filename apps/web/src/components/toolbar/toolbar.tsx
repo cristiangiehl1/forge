@@ -1,6 +1,7 @@
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 import type { NewTableId } from '../../lib/settings/settings.ts'
 import { NEW_TABLE_ID_CHOICES } from '../../lib/settings/settings.ts'
+import { ConfirmButton } from '../confirm-button.tsx'
 
 interface ToolbarProps {
   ddlOpen: boolean
@@ -15,6 +16,7 @@ const NEW_TABLE_ID_LABELS: Record<NewTableId, string> = {
 
 export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
   const newTableId = useForgeStore((state) => state.settings.newTableId)
+  const hasTables = useForgeStore((state) => state.schema.tables.length > 0)
 
   return (
     <header className='toolbar'>
@@ -38,6 +40,19 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
           ))}
         </select>
       </label>
+      {hasTables ? (
+        <ConfirmButton
+          label='Load example'
+          armedLabel='Replace the project with the example?'
+          onConfirm={() => forgeStore.getState().loadExample()}
+        />
+      ) : (
+        <button
+          type='button'
+          onClick={() => forgeStore.getState().loadExample()}>
+          Load example
+        </button>
+      )}
       <button type='button' aria-pressed={ddlOpen} onClick={onToggleDdl}>
         {ddlOpen ? 'Hide DDL' : 'Show DDL'}
       </button>
