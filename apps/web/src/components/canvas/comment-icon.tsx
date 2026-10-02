@@ -22,9 +22,8 @@ export function CommentIcon({ text, label }: { text: string; label: string }) {
         onMouseEnter={(event) => show(event.currentTarget)}
         onMouseLeave={() => setAnchor(null)}
         onFocus={(event) => show(event.currentTarget)}
-        onBlur={() => setAnchor(null)}>
-        <span aria-hidden='true'>i</span>
-      </button>
+        onBlur={() => setAnchor(null)}
+      />
       {anchor &&
         createPortal(
           <div

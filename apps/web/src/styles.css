@@ -398,6 +398,10 @@ button {
   cursor: help;
 }
 
+.comment-icon::before {
+  content: "i";
+}
+
 .comment-tooltip {
   position: fixed;
   z-index: 1000;

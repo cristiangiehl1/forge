@@ -25,3 +25,11 @@ The vocabulary of the domain model. Nothing here knows about the canvas.
 **View**: the opaque slot of a Project that the web fills with node positions and the viewport. To the core it is just JSON to carry along.
 
 **Generated column**: a Column whose value the database produces: an identity for an `integer` or `bigint`, a default (`gen_random_uuid()`) for a `uuid`, `DEFAULT now()` for a `timestamp` (stored as `timestamptz`, so in UTC). It is a flag on the Column (`generated`), allowed only on those four types, and absent means false. Avoid "auto-increment" and "serial" in code and in the model; the toolbar says "auto-increment" to the user, because that is the familiar word.
+
+**Index**: a named index on one table: its columns in order, `unique`, and a method (`btree`, `hash`, `gin`, `gist`). Partial and expression indexes are not modelled. Index names are unique across the whole Schema, as in PostgreSQL.
+
+**User type**: an enum (a name and its values) or a domain (a name over a base type, optionally `NOT NULL` and with a default). Columns use one through `{ kind: 'user', typeId }`. A user type that is in use cannot be removed.
+
+**Default**: a raw SQL expression on a Column, written into the DDL as it is. It excludes Generated; an empty string means none.
+
+**Comment**: free text on a Table or a Column, written as `COMMENT ON`. Blank means none.

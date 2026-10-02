@@ -54,7 +54,7 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
           {table.name || '(unnamed)'}
         </span>
         {hasComment(table.comment) && (
-          <CommentIcon text={table.comment} label='Table comment' />
+          <CommentIcon text={table.comment} label='Show table comment' />
         )}
       </div>
       <ul className='table-node__columns'>
@@ -79,7 +79,7 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
               {column.name || '(unnamed)'}
             </span>
             {hasComment(column.comment) && (
-              <CommentIcon text={column.comment} label='Column comment' />
+              <CommentIcon text={column.comment} label='Show column comment' />
             )}
             <span className='table-node__type'>
               {formatColumnType(column.type, typeName)}

@@ -17,12 +17,19 @@ interface ColumnDef {
   notNull?: boolean
   generated?: boolean
   primaryKey?: boolean
+  default?: string
+  comment?: string
 }
 
 interface TableDef {
   name: string
   columns: ColumnDef[]
+  comment?: string
+  indexes?: { name: string; columns: string[]; unique?: boolean }[]
 }
+
+const ORDER_STATUS_ID = 'ex-ty-order_status'
+const orderStatus: ColumnType = { kind: 'user', typeId: ORDER_STATUS_ID }
 
 const integer: ColumnType = { kind: 'integer' }
 const varchar = (length: number): ColumnType => ({ kind: 'varchar', length })
@@ -52,12 +59,19 @@ const timestamps = (): ColumnDef[] =>
 const TABLES: TableDef[] = [
   {
     name: 'users',
+    comment: 'People who can place orders',
     columns: [
       id(),
       { name: 'name', type: varchar(120), notNull: true },
-      { name: 'email', type: varchar(255), notNull: true },
+      {
+        name: 'email',
+        type: varchar(255),
+        notNull: true,
+        comment: 'Login address, unique',
+      },
       ...timestamps(),
     ],
+    indexes: [{ name: 'uq_users_email', columns: ['email'], unique: true }],
   },
   {
     name: 'addresses',
@@ -79,9 +93,22 @@ const TABLES: TableDef[] = [
       id(),
       { name: 'user_id', type: integer, notNull: true },
       { name: 'address_id', type: integer },
-      { name: 'status', type: varchar(20), notNull: true },
-      { name: 'total', type: money(12) },
+      {
+        name: 'status',
+        type: orderStatus,
+        notNull: true,
+        default: "'pending'",
+      },
+      {
+        name: 'total',
+        type: money(12),
+        comment: 'Sum of the items, in the shop currency',
+      },
       ...timestamps(),
+    ],
+    indexes: [
+      { name: 'idx_orders_user_id', columns: ['user_id'] },
+      { name: 'idx_orders_created_at', columns: ['created_at'] },
     ],
   },
   {
@@ -131,7 +158,12 @@ const tableId = (table: string) => `ex-t-${table}`
 const columnId = (table: string, column: string) => `ex-c-${table}-${column}`
 
 export function createShopExample(): { schema: Schema; view: ProjectView } {
-  let schema = core.createSchema()
+  let schema = core.addType(core.createSchema(), {
+    kind: 'enum',
+    id: ORDER_STATUS_ID,
+    name: 'order_status',
+    values: ['pending', 'paid', 'shipped', 'cancelled'],
+  })
 
   for (const table of TABLES) {
     schema = core.addTable(schema, {
@@ -145,6 +177,20 @@ export function createShopExample(): { schema: Schema; view: ProjectView } {
         type: column.type,
         nullable: !(column.notNull || column.primaryKey),
         ...(column.generated ? { generated: true } : {}),
+        ...(column.default ? { default: column.default } : {}),
+        ...(column.comment ? { comment: column.comment } : {}),
+      })
+    }
+    if (table.comment) {
+      schema = core.setTableComment(schema, tableId(table.name), table.comment)
+    }
+    for (const index of table.indexes ?? []) {
+      schema = core.addIndex(schema, tableId(table.name), {
+        id: `ex-i-${index.name}`,
+        name: index.name,
+        columns: index.columns.map((name) => columnId(table.name, name)),
+        unique: index.unique ?? false,
+        method: 'btree',
       })
     }
     schema = core.setPrimaryKey(

@@ -33,3 +33,9 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 **Route**: the orthogonal polyline of a Relationship, worked out by `routeRelationships` so it goes round every table. Each column row has a connection point on both sides of its table; the route picks the sides, and the edge draws exactly those points.
 
 **Hover**: the Table under the pointer, or whose statement in the DDL panel is under the pointer. It highlights the node, its Relationship lines and its statement (the rest of the script dims).
+
+**Comment icon**: a small mark in a table's title, or in a column's row, when that table or column has a Comment. Hovering or focusing it shows the comment in a tooltip drawn in the page body, so it never changes the node's fixed size.
+
+**Types section**: what the Inspector shows when no table is selected: the enums and domains of the project, with add, edit and remove. A type that is used by a column shows "Used by: table.column" instead of a remove button.
+
+**UQ badge**: the mark on a column that has a unique index of its own (a single column).
