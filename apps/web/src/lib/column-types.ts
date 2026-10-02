@@ -60,7 +60,7 @@ export function formatColumnType(
 }
 
 export const baseType = (type: ColumnType): ColumnType =>
-  type.kind === 'array' ? type.of : type
+  type.kind === 'array' ? baseType(type.of) : type
 
 /** Applies a change to the element of an array, or to the type itself. */
 export function mapBase(
@@ -68,7 +68,7 @@ export function mapBase(
   change: (base: ColumnType) => ColumnType
 ): ColumnType {
   return type.kind === 'array'
-    ? { kind: 'array', of: change(type.of) }
+    ? { kind: 'array', of: mapBase(type.of, change) }
     : change(type)
 }
 

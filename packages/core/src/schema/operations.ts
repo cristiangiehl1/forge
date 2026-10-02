@@ -176,7 +176,7 @@ export function setTableComment(
   if (!findTable(schema, tableId)) return schema
   return replaceTable(schema, tableId, (table) => {
     const { comment: _previous, ...rest } = table
-    return comment.trim() === '' ? rest : { ...rest, comment }
+    return comment === '' ? rest : { ...rest, comment }
   })
 }
 

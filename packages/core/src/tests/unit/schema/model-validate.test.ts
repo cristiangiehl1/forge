@@ -256,3 +256,122 @@ describe('validate: domain cycles', () => {
     )
   })
 })
+
+describe('validate: names that share a namespace', () => {
+  const col = (id: string, name: string): Column => ({
+    id,
+    name,
+    type: { kind: 'text' },
+    nullable: true,
+  })
+
+  it('flags an index named like a table, and a type named like a table', () => {
+    const indexNamedLikeTable = schemaOf([
+      {
+        id: 't1',
+        name: 'users',
+        columns: [col('c', 'a')],
+        primaryKey: [],
+        indexes: [
+          {
+            id: 'i',
+            name: 'orders',
+            columns: ['c'],
+            unique: false,
+            method: 'btree',
+          },
+        ],
+      },
+      { id: 't2', name: 'orders', columns: [], primaryKey: [] },
+    ])
+    assert.deepEqual(codes(indexNamedLikeTable), ['name-collision'])
+
+    const typeNamedLikeTable = schemaOf(
+      [{ id: 't', name: 'status', columns: [], primaryKey: [] }],
+      [{ kind: 'enum', id: 'e', name: 'status', values: ['a'] }]
+    )
+    assert.deepEqual(codes(typeNamedLikeTable), ['name-collision'])
+  })
+
+  it('does not flag an index and a type that share a name, nor unrelated names', () => {
+    const fine = schemaOf(
+      [
+        {
+          id: 't',
+          name: 'users',
+          columns: [col('c', 'a')],
+          primaryKey: [],
+          indexes: [
+            {
+              id: 'i',
+              name: 'status',
+              columns: ['c'],
+              unique: false,
+              method: 'btree',
+            },
+          ],
+        },
+      ],
+      [{ kind: 'enum', id: 'e', name: 'status', values: ['a'] }]
+    )
+    assert.deepEqual(codes(fine), [])
+  })
+})
+
+describe('validate: the message for two types that differ', () => {
+  it('names the user types and shows arrays, instead of "user"', () => {
+    const enumA: UserType = {
+      kind: 'enum',
+      id: 'a',
+      name: 'colour',
+      values: ['x'],
+    }
+    const enumB: UserType = {
+      kind: 'enum',
+      id: 'b',
+      name: 'shape',
+      values: ['x'],
+    }
+    const column = (id: string, type: ColumnType): Column => ({
+      id,
+      name: 'k',
+      type,
+      nullable: true,
+    })
+    const schema: Schema = {
+      ...schemaOf(
+        [
+          {
+            id: 't1',
+            name: 'child',
+            columns: [column('c1', { kind: 'user', typeId: 'a' })],
+            primaryKey: [],
+          },
+          {
+            id: 't2',
+            name: 'parent',
+            columns: [
+              column('c2', {
+                kind: 'array',
+                of: { kind: 'user', typeId: 'b' },
+              }),
+            ],
+            primaryKey: ['c2'],
+          },
+        ],
+        [enumA, enumB]
+      ),
+      relationships: [
+        {
+          id: 'r',
+          from: { tableId: 't1', columnId: 'c1' },
+          to: { tableId: 't2', columnId: 'c2' },
+        },
+      ],
+    }
+    const [issue] = validate(schema)
+    assert.equal(issue?.code, 'relationship-type-mismatch')
+    assert.ok(issue?.message.includes('(colour)'), issue?.message)
+    assert.ok(issue?.message.includes('(shape[])'), issue?.message)
+  })
+})

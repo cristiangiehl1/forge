@@ -61,6 +61,32 @@ describe('indexes', () => {
     assert.deepEqual(names, ['idx_table_1_column_1', 'idx_table_1_column_1_2'])
   })
 
+  it('renames a default-named index when it becomes unique or changes columns, but not a chosen name', () => {
+    const { store, tableId } = withColumns()
+    const second = store.getState().addColumn(tableId)
+    assert.ok(second)
+    const id = store.getState().addIndex(tableId)
+    assert.ok(id)
+    store.getState().updateIndex(tableId, id, { unique: true })
+    assert.equal(
+      store.getState().schema.tables[0]?.indexes?.[0]?.name,
+      'uq_table_1_column_1'
+    )
+    store.getState().updateIndex(tableId, id, {
+      columns: [
+        store.getState().schema.tables[0]?.columns[0]?.id as string,
+        second,
+      ],
+    })
+    assert.equal(
+      store.getState().schema.tables[0]?.indexes?.[0]?.name,
+      'uq_table_1_column_1_column_2'
+    )
+    store.getState().updateIndex(tableId, id, { name: 'mine' })
+    store.getState().updateIndex(tableId, id, { unique: false })
+    assert.equal(store.getState().schema.tables[0]?.indexes?.[0]?.name, 'mine')
+  })
+
   it('updates and removes an index', () => {
     const { store, tableId } = withColumns()
     const id = store.getState().addIndex(tableId)

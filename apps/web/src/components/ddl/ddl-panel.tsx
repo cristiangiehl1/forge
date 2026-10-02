@@ -40,7 +40,7 @@ export function DdlPanel() {
         <ul>
           {result.issues.map((issue) => (
             <li
-              key={`${issue.code}:${issue.tableId ?? ''}:${issue.columnId ?? ''}:${issue.relationshipId ?? ''}`}>
+              key={`${issue.code}:${issue.tableId ?? ''}:${issue.columnId ?? ''}:${issue.relationshipId ?? ''}:${issue.indexId ?? ''}:${issue.typeId ?? ''}`}>
               {issue.message}
             </li>
           ))}

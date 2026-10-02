@@ -2128,7 +2128,7 @@ Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>"
 
 **Interfaces:**
 - Consumes: Task 6 `addType`, `updateType`, `removeType`; `typeUsages`, `COLUMN_KINDS`, `kindLabel`, `typeFromChoice`, `choiceOf`, `ConfirmButton`.
-- Produces: shown when no table is selected: heading `Types`; buttons `Add enum` and `Add domain`; per type `Type name`; an enum has `Enum values` (a textarea, one value per line); a domain has `Domain base type` (select, same values as `Column type` but without arrays and without itself), `Domain not null` (checkbox) and `Domain default`; a `ConfirmButton` `Remove type`, disabled while the type is used, with the line `Used by: <table>.<column>, …` shown next to it.
+- Produces: shown when no table is selected: heading `Types`; buttons `Add enum` and `Add domain`; per type `Type name`; an enum has `Enum values` (a textarea, one value per line); a domain has `Domain base type` (select, same values as `Column type` but without arrays and without itself), `Domain not null` (checkbox) and `Domain default`; a `ConfirmButton` `Remove type`, which is hidden while the type is used and replaced by the line `Used by: <table>.<column>, …`.
 
 - [ ] **Step 1: Create `types-panel.tsx`**
 

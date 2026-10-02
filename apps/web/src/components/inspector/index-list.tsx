@@ -29,6 +29,10 @@ function IndexRow({ table, index }: { table: Table; index: Index }) {
             <input
               type='checkbox'
               checked={index.columns.includes(column.id)}
+              // An index needs a column: the last one stays checked.
+              disabled={
+                index.columns.length === 1 && index.columns[0] === column.id
+              }
               onChange={(event) => toggle(column.id, event.target.checked)}
             />
             {column.name || '(unnamed)'}

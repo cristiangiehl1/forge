@@ -3,6 +3,7 @@ import type {
   Column,
   ColumnId,
   ColumnRef,
+  ColumnType,
   IndexId,
   Relationship,
   RelationshipId,
@@ -33,6 +34,7 @@ export type IssueCode =
   | 'enum-duplicate-value'
   | 'unknown-type'
   | 'type-cycle'
+  | 'name-collision'
   | 'multiple-relationships-from-column'
   | 'relationship-unknown-column'
   | 'relationship-type-mismatch'
@@ -80,6 +82,17 @@ function locate(schema: Schema, ref: ColumnRef): Located | null {
 
 const isBlank = (name: string) => name.trim() === ''
 
+/** A type as a person would say it: a user type by its name, arrays with []. */
+function describeType(schema: Schema, type: ColumnType): string {
+  if (type.kind === 'array') return `${describeType(schema, type.of)}[]`
+  if (type.kind === 'user') {
+    return (
+      schema.types?.find((t) => t.id === type.typeId)?.name ?? 'unknown type'
+    )
+  }
+  return type.kind
+}
+
 function relationshipIssue(
   schema: Schema,
   from: ColumnRef,
@@ -121,7 +134,7 @@ function relationshipIssue(
   if (!sameTypeShape(source.column.type, target.column.type)) {
     return issue(
       'relationship-type-mismatch',
-      `Column "${sourceName}" (${source.column.type.kind}) cannot reference "${targetName}" (${target.column.type.kind}): the types differ.`,
+      `Column "${sourceName}" (${describeType(schema, source.column.type)}) cannot reference "${targetName}" (${describeType(schema, target.column.type)}): the types differ.`,
       ids
     )
   }
@@ -313,6 +326,23 @@ export function validate(schema: Schema): Issue[] {
     return false
   }
 
+  // Tables, indexes and types of PostgreSQL share names: a table has a row type,
+  // and an index is a relation like a table.
+  const tableNames = new Set(schema.tables.map((table) => table.name))
+  for (const table of schema.tables) {
+    for (const index of table.indexes ?? []) {
+      if (tableNames.has(index.name)) {
+        issues.push(
+          issue(
+            'name-collision',
+            `Index "${index.name}" has the name of a table.`,
+            { tableId: table.id, indexId: index.id }
+          )
+        )
+      }
+    }
+  }
+
   const seenTypeNames = new Set<string>()
   for (const userType of types) {
     const ids = { typeId: userType.id }
@@ -323,6 +353,15 @@ export function validate(schema: Schema): Issue[] {
         issue(
           'duplicate-type-name',
           `Type name "${userType.name}" is used more than once.`,
+          ids
+        )
+      )
+    }
+    if (tableNames.has(userType.name)) {
+      issues.push(
+        issue(
+          'name-collision',
+          `Type "${userType.name}" has the name of a table.`,
           ids
         )
       )

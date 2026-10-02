@@ -70,6 +70,23 @@ describe('array and choice helpers', () => {
     )
   })
 
+  it('sees through nested arrays too, and keeps their depth when mapping', () => {
+    const nested: ColumnType = {
+      kind: 'array',
+      of: { kind: 'array', of: { kind: 'integer' } },
+    }
+    assert.deepEqual(baseType(nested), { kind: 'integer' })
+    assert.equal(choiceOf(nested), 'integer')
+    assert.deepEqual(
+      mapBase(nested, () => ({ kind: 'text' })),
+      {
+        kind: 'array',
+        of: { kind: 'array', of: { kind: 'text' } },
+      }
+    )
+    assert.deepEqual(withArray(nested, false), { kind: 'integer' })
+  })
+
   it('withArray wraps and unwraps, and is idempotent', () => {
     assert.deepEqual(withArray({ kind: 'integer' }, true), ints)
     assert.deepEqual(withArray(ints, true), ints)

@@ -20,6 +20,7 @@ import type { LoadResult } from '../../queries/project/load-project.ts'
 import { createShopExample } from '../example/shop-example.ts'
 import { mergeImported } from '../import/merge-schema.ts'
 import { placeAdded } from '../import/place-added.ts'
+import { defaultIndexName, renamedByDefault } from '../index-names.ts'
 import { layoutTables } from '../layout/layout-tables.ts'
 import type { NodePosition, ProjectView, Viewport } from '../project-view.ts'
 import {
@@ -373,7 +374,10 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
       const id = newId()
       const index: Index = {
         id,
-        name: freeName(`idx_${table.name}_${first.name}`, taken),
+        name: freeName(
+          defaultIndexName(table.name, [first.name], false),
+          taken
+        ),
         columns: [first.id],
         unique: false,
         method: 'btree',
@@ -382,8 +386,41 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
       return id
     },
 
-    updateIndex: (tableId, indexId, patch) =>
-      set({ schema: core.updateIndex(get().schema, tableId, indexId, patch) }),
+    updateIndex: (tableId, indexId, patch) => {
+      const { schema } = get()
+      const table = schema.tables.find((candidate) => candidate.id === tableId)
+      const index = table?.indexes?.find(
+        (candidate) => candidate.id === indexId
+      )
+      let applied = patch
+      if (table && index && patch.name === undefined) {
+        const names = (ids: string[]) =>
+          ids.map((id) => table.columns.find((c) => c.id === id)?.name ?? '')
+        const renamed = renamedByDefault(
+          {
+            table: table.name,
+            name: index.name,
+            columns: names(index.columns),
+            unique: index.unique,
+          },
+          {
+            ...(patch.columns ? { columns: names(patch.columns) } : {}),
+            ...(patch.unique === undefined ? {} : { unique: patch.unique }),
+          }
+        )
+        if (renamed !== null) {
+          const taken = schema.tables.flatMap((candidate) =>
+            (candidate.indexes ?? [])
+              .filter((other) => other.id !== indexId)
+              .map((other) => other.name)
+          )
+          applied = { ...patch, name: freeName(renamed, taken) }
+        }
+      }
+      set({
+        schema: core.updateIndex(schema, tableId, indexId, applied),
+      })
+    },
 
     removeIndex: (tableId, indexId) =>
       set({ schema: core.removeIndex(get().schema, tableId, indexId) }),

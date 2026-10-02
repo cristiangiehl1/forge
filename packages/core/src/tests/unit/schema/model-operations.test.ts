@@ -49,8 +49,14 @@ describe('setTableComment', () => {
   it('sets a comment, and removes the key when it is blank', () => {
     const commented = setTableComment(base(), 't', 'People')
     assert.equal(commented.tables[0]?.comment, 'People')
-    const cleared = setTableComment(commented, 't', '  ')
+    const cleared = setTableComment(commented, 't', '')
     assert.equal('comment' in (cleared.tables[0] ?? {}), false)
+    // Spaces typed on the way to a word are kept: only an empty text is none.
+    assert.equal(
+      setTableComment(base(), 't', ' hello').tables[0]?.comment,
+      ' hello'
+    )
+    assert.equal(setTableComment(base(), 't', ' ').tables[0]?.comment, ' ')
   })
 
   it('ignores an unknown table', () => {

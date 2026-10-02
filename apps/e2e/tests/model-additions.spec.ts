@@ -86,12 +86,12 @@ test.describe('comments, indexes, defaults and types', () => {
 
     await page.getByLabel('Index unique').check()
     expect(await editor.ddl()).toContain(
-      'CREATE UNIQUE INDEX "idx_categories_id" ON "categories" ("id");'
+      'CREATE UNIQUE INDEX "uq_categories_id" ON "categories" ("id");'
     )
 
     await page.getByRole('button', { name: 'Remove index' }).click()
     await page.getByRole('button', { name: 'Click again to delete' }).click()
-    expect(await editor.ddl()).not.toContain('idx_categories_id')
+    expect(await editor.ddl()).not.toContain('categories_id')
   })
 
   test('hovering a table also lights its CREATE INDEX statement', async ({
@@ -143,6 +143,64 @@ test.describe('comments, indexes, defaults and types', () => {
     await expect(page.getByText('Used by: tickets.mood')).toBeVisible()
     await expect(page.getByRole('button', { name: 'Remove type' })).toHaveCount(
       0
+    )
+  })
+
+  test('the last column of an index cannot be unchecked, so it never ends up empty', async ({
+    page,
+  }) => {
+    const editor = await exampleLoaded(page)
+    await editor.selectTable('categories')
+    await page.getByRole('button', { name: 'Add index' }).click()
+    const columns = page.getByRole('group', { name: 'Index columns' })
+    await expect(columns.getByRole('checkbox', { name: 'id' })).toBeChecked()
+    await expect(columns.getByRole('checkbox', { name: 'id' })).toBeDisabled()
+    await columns.getByRole('checkbox', { name: 'name' }).check()
+    await expect(columns.getByRole('checkbox', { name: 'id' })).toBeEnabled()
+  })
+
+  test('the default name of an index follows Unique, a chosen name does not', async ({
+    page,
+  }) => {
+    const editor = await exampleLoaded(page)
+    await editor.selectTable('categories')
+    await page.getByRole('button', { name: 'Add index' }).click()
+    const name = page.getByLabel('Index name')
+    await expect(name).toHaveValue('idx_categories_id')
+    await page.getByLabel('Index unique').check()
+    await expect(name).toHaveValue('uq_categories_id')
+    await name.fill('my_index')
+    await page.getByLabel('Index unique').uncheck()
+    await expect(name).toHaveValue('my_index')
+  })
+
+  test('the comment tooltip is tied to its icon for assistive technology, and goes away when the canvas zooms', async ({
+    page,
+  }) => {
+    const editor = await exampleLoaded(page)
+    const icon = editor
+      .node('users')
+      .locator('.table-node__column', { hasText: 'email' })
+      .getByRole('button', { name: 'Show column comment' })
+    await icon.hover()
+    const tooltip = page.getByRole('tooltip')
+    await expect(tooltip).toBeVisible()
+    const id = await tooltip.getAttribute('id')
+    expect(id).toBeTruthy()
+    await expect(icon).toHaveAttribute('aria-describedby', id as string)
+
+    await page.mouse.wheel(0, 120)
+    await expect(page.getByRole('tooltip')).toHaveCount(0)
+  })
+
+  test('a domain based on varchar has a length to edit', async ({ page }) => {
+    const editor = new Editor(page)
+    await editor.open()
+    await page.getByRole('button', { name: 'Add domain' }).click()
+    await page.getByLabel('Domain base type').selectOption('varchar')
+    await page.getByRole('spinbutton', { name: 'Length' }).fill('50')
+    expect(await editor.ddl()).toContain(
+      'CREATE DOMAIN "type_1" AS varchar(50);'
     )
   })
 })

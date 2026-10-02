@@ -1,14 +1,23 @@
 import type { Schema, UserType } from '@forge/core'
-import { typeDependsOn, typeUsages } from '@forge/core'
+import {
+  MAX_NUMERIC_PRECISION,
+  MAX_VARCHAR_LENGTH,
+  typeDependsOn,
+  typeUsages,
+} from '@forge/core'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 import {
   COLUMN_KINDS,
   choiceOf,
   kindLabel,
+  setNumericPrecision,
+  setNumericScale,
+  setVarcharLength,
   typeFromChoice,
 } from '../../lib/column-types.ts'
 import { ConfirmButton } from '../confirm-button.tsx'
+import { NumberField } from './number-field.tsx'
 
 /** Where a type is used, in words: `users.status`, or the domain's name. */
 function describeUsages(schema: Schema, typeId: string): string[] {
@@ -77,6 +86,59 @@ function TypeRow({ type, schema }: { type: UserType; schema: Schema }) {
               </optgroup>
             )}
           </select>
+          {type.base.kind === 'varchar' && (
+            <NumberField
+              label='Length'
+              value={type.base.length}
+              min={1}
+              max={MAX_VARCHAR_LENGTH}
+              onCommit={(length) =>
+                updateType({
+                  ...type,
+                  base: setVarcharLength(type.base, length),
+                })
+              }
+            />
+          )}
+          {type.base.kind === 'char' && (
+            <NumberField
+              label='Length'
+              value={type.base.length}
+              min={1}
+              max={MAX_VARCHAR_LENGTH}
+              onCommit={(length) =>
+                updateType({ ...type, base: { kind: 'char', length } })
+              }
+            />
+          )}
+          {type.base.kind === 'numeric' && (
+            <>
+              <NumberField
+                label='Precision'
+                value={type.base.precision}
+                min={1}
+                max={MAX_NUMERIC_PRECISION}
+                onCommit={(precision) =>
+                  updateType({
+                    ...type,
+                    base: setNumericPrecision(type.base, precision),
+                  })
+                }
+              />
+              <NumberField
+                label='Scale'
+                value={type.base.scale}
+                min={0}
+                max={type.base.precision}
+                onCommit={(scale) =>
+                  updateType({
+                    ...type,
+                    base: setNumericScale(type.base, scale),
+                  })
+                }
+              />
+            </>
+          )}
           <label>
             <input
               type='checkbox'
