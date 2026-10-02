@@ -184,6 +184,17 @@ button {
   border-radius: 6px;
 }
 
+.column-row__extra {
+  display: flex;
+  flex: 1 0 100%;
+  gap: 6px;
+}
+
+.column-row__extra input {
+  flex: 1;
+  min-width: 0;
+}
+
 .column-row input[type="number"] {
   width: 72px;
 }

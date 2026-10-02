@@ -2,12 +2,17 @@ import type { Column, Table } from '@forge/core'
 import { MAX_NUMERIC_PRECISION, MAX_VARCHAR_LENGTH } from '@forge/core'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
-import type { ColumnKind } from '../../lib/column-types.ts'
 import {
+  baseType,
   COLUMN_KINDS,
+  choiceOf,
+  kindLabel,
+  mapBase,
   setNumericPrecision,
   setNumericScale,
   setVarcharLength,
+  typeFromChoice,
+  withArray,
 } from '../../lib/column-types.ts'
 import {
   impliesNotNull,
@@ -23,6 +28,8 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
   const { updateColumn, removeColumn, setPrimaryKey } = forgeStore.getState()
   const isPrimaryKey = table.primaryKey.includes(column.id)
   const notNullIsForced = isPrimaryKey || impliesNotNull(column)
+  const userTypes = useForgeStore((state) => state.schema.types) ?? []
+  const base = baseType(column.type)
 
   return (
     <li className='column-row'>
@@ -35,54 +42,92 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
       />
       <select
         aria-label='Column type'
-        value={column.type.kind}
+        value={choiceOf(column.type)}
         onChange={(event) =>
           updateColumn(
             table.id,
             column.id,
-            typeChangePatch(column, event.target.value as ColumnKind)
+            typeChangePatch(
+              column,
+              typeFromChoice(event.target.value, column.type.kind === 'array')
+            )
           )
         }>
         {COLUMN_KINDS.map((kind) => (
           <option key={kind} value={kind}>
-            {kind}
+            {kindLabel(kind)}
           </option>
         ))}
+        {userTypes.length > 0 && (
+          <optgroup label='Custom types'>
+            {userTypes.map((type) => (
+              <option key={type.id} value={`user:${type.id}`}>
+                {type.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
       </select>
-      {column.type.kind === 'varchar' && (
+      <label>
+        <input
+          type='checkbox'
+          aria-label='Array'
+          checked={column.type.kind === 'array'}
+          onChange={(event) =>
+            updateColumn(
+              table.id,
+              column.id,
+              typeChangePatch(
+                column,
+                withArray(column.type, event.target.checked)
+              )
+            )
+          }
+        />
+        []
+      </label>
+      {(base.kind === 'varchar' || base.kind === 'char') && (
         <NumberField
           label='Length'
-          value={column.type.length}
+          value={base.length}
           min={1}
           max={MAX_VARCHAR_LENGTH}
           onCommit={(length) =>
             updateColumn(table.id, column.id, {
-              type: setVarcharLength(column.type, length),
+              type: mapBase(column.type, (current) =>
+                current.kind === 'char'
+                  ? { kind: 'char', length }
+                  : setVarcharLength(current, length)
+              ),
             })
           }
         />
       )}
-      {column.type.kind === 'numeric' && (
+      {base.kind === 'numeric' && (
         <>
           <NumberField
             label='Precision'
-            value={column.type.precision}
+            value={base.precision}
             min={1}
             max={MAX_NUMERIC_PRECISION}
             onCommit={(precision) =>
               updateColumn(table.id, column.id, {
-                type: setNumericPrecision(column.type, precision),
+                type: mapBase(column.type, (current) =>
+                  setNumericPrecision(current, precision)
+                ),
               })
             }
           />
           <NumberField
             label='Scale'
-            value={column.type.scale}
+            value={base.scale}
             min={0}
-            max={column.type.precision}
+            max={base.precision}
             onCommit={(scale) =>
               updateColumn(table.id, column.id, {
-                type: setNumericScale(column.type, scale),
+                type: mapBase(column.type, (current) =>
+                  setNumericScale(current, scale)
+                ),
               })
             }
           />
@@ -122,12 +167,32 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
             onChange={(event) =>
               updateColumn(table.id, column.id, {
                 generated: event.target.checked,
+                ...(event.target.checked ? { default: '' } : {}),
               })
             }
           />
           Auto-generate
         </label>
       )}
+      <div className='column-row__extra'>
+        <input
+          aria-label='Column default'
+          placeholder='default (SQL expression)'
+          value={column.default ?? ''}
+          disabled={column.generated === true}
+          onChange={(event) =>
+            updateColumn(table.id, column.id, { default: event.target.value })
+          }
+        />
+        <input
+          aria-label='Column comment'
+          placeholder='comment'
+          value={column.comment ?? ''}
+          onChange={(event) =>
+            updateColumn(table.id, column.id, { comment: event.target.value })
+          }
+        />
+      </div>
       <button
         type='button'
         aria-label='Remove column'
