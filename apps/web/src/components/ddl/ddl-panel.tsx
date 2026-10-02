@@ -10,11 +10,17 @@ export function DdlPanel() {
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const hoveredTable = useForgeStore((state) => state.hoveredTable)
   const activeRef = useRef<HTMLSpanElement | null>(null)
+  // True while the pointer is over a statement: the hover then comes from the
+  // panel itself, and scrolling it to a statement would move what is under the
+  // pointer.
+  const pointerInPanel = useRef(false)
   const result = generateDdl(schema, postgres)
 
   // Bring the hovered table's statement into view; the panel scrolls, not the page.
   useEffect(() => {
-    if (hoveredTable) activeRef.current?.scrollIntoView({ block: 'nearest' })
+    if (hoveredTable && !pointerInPanel.current) {
+      activeRef.current?.scrollIntoView({ block: 'nearest' })
+    }
   }, [hoveredTable])
 
   async function copy(sql: string) {
@@ -77,11 +83,15 @@ export function DdlPanel() {
                       active ? 'ddl-statement ddl-active' : 'ddl-statement'
                     }
                     onMouseEnter={() => {
+                      pointerInPanel.current = true
                       if (tableId !== null) {
                         forgeStore.getState().hoverTable(tableId)
                       }
                     }}
-                    onMouseLeave={() => forgeStore.getState().hoverTable(null)}>
+                    onMouseLeave={() => {
+                      pointerInPanel.current = false
+                      forgeStore.getState().hoverTable(null)
+                    }}>
                     {statement.sql}
                     {index < result.statements.length - 1 ? '\n\n' : '\n'}
                   </span>
