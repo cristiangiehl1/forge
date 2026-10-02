@@ -1,16 +1,25 @@
 export type TableId = string
 export type ColumnId = string
 export type RelationshipId = string
+export type TypeId = string
+export type IndexId = string
 
 export const SIMPLE_COLUMN_KINDS = [
   'integer',
   'bigint',
+  'smallint',
   'text',
   'boolean',
   'uuid',
   'timestamp',
+  'timestamp_no_tz',
+  'time',
   'date',
+  'interval',
   'json',
+  'real',
+  'double',
+  'bytea',
 ] as const
 
 export type SimpleColumnKind = (typeof SIMPLE_COLUMN_KINDS)[number]
@@ -23,7 +32,10 @@ export const MAX_NUMERIC_PRECISION = 1000
 export type ColumnType =
   | { kind: SimpleColumnKind }
   | { kind: 'varchar'; length: number }
+  | { kind: 'char'; length: number }
   | { kind: 'numeric'; precision: number; scale: number }
+  | { kind: 'array'; of: ColumnType }
+  | { kind: 'user'; typeId: TypeId }
 
 /** The kinds a database can generate a value for: identity or a default (a timestamp defaults to now()). */
 export const GENERATED_COLUMN_KINDS = [
@@ -43,6 +55,22 @@ export interface Column {
    * uuid). Absent means false, which keeps projects saved before it valid.
    */
   generated?: boolean
+  /** A raw SQL expression, written as is. Empty means none; it excludes `generated`. */
+  default?: string
+  /** Free text, emitted as COMMENT ON. Empty means none. */
+  comment?: string
+}
+
+export const INDEX_METHODS = ['btree', 'hash', 'gin', 'gist'] as const
+export type IndexMethod = (typeof INDEX_METHODS)[number]
+
+export interface Index {
+  id: IndexId
+  name: string
+  /** In the order the index sorts them. */
+  columns: ColumnId[]
+  unique: boolean
+  method: IndexMethod
 }
 
 export interface Table {
@@ -50,7 +78,29 @@ export interface Table {
   name: string
   columns: Column[]
   primaryKey: ColumnId[]
+  comment?: string
+  /** Absent means none, which keeps projects saved before indexes valid. */
+  indexes?: Index[]
 }
+
+export interface EnumType {
+  kind: 'enum'
+  id: TypeId
+  name: string
+  values: string[]
+}
+
+/** A domain's CHECK is not modelled. */
+export interface DomainType {
+  kind: 'domain'
+  id: TypeId
+  name: string
+  base: ColumnType
+  notNull?: boolean
+  default?: string
+}
+
+export type UserType = EnumType | DomainType
 
 export interface ColumnRef {
   tableId: TableId
@@ -68,4 +118,6 @@ export interface Schema {
   version: 1
   tables: Table[]
   relationships: Relationship[]
+  /** Absent means none. */
+  types?: UserType[]
 }
