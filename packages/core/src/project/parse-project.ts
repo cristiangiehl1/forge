@@ -1,3 +1,5 @@
+import type { DialectId, DialectOptions } from '../dialects/dialect.ts'
+import { DIALECT_IDS } from '../dialects/dialect.ts'
 import type {
   Column,
   ColumnType,
@@ -534,6 +536,41 @@ export function parseProject(input: unknown): ParseResult {
   const schema = parseSchema(input.schema, 'schema', (path, message) => {
     errors.push({ path, message })
   })
+
+  let dialect: DialectId | undefined
+  if (input.dialect !== undefined) {
+    if (
+      typeof input.dialect === 'string' &&
+      (DIALECT_IDS as readonly string[]).includes(input.dialect)
+    ) {
+      dialect = input.dialect as DialectId
+    } else {
+      errors.push({
+        path: 'dialect',
+        message: `"dialect" must be one of ${DIALECT_IDS.join(', ')}.`,
+      })
+    }
+  }
+
+  const options: DialectOptions = {}
+  if (input.options !== undefined) {
+    if (!isRecord(input.options)) {
+      errors.push({ path: 'options', message: '"options" must be an object.' })
+    } else if (input.options.uuid !== undefined) {
+      if (
+        input.options.uuid === 'raw16' ||
+        input.options.uuid === 'varchar36'
+      ) {
+        options.uuid = input.options.uuid
+      } else {
+        errors.push({
+          path: 'options.uuid',
+          message: '"uuid" must be "raw16" or "varchar36".',
+        })
+      }
+    }
+  }
+
   if (errors.length > 0 || !schema) return { ok: false, errors }
 
   return {
@@ -542,6 +579,8 @@ export function parseProject(input: unknown): ParseResult {
       formatVersion: CURRENT_FORMAT_VERSION,
       schema,
       view: input.view ?? null,
+      ...(dialect === undefined ? {} : { dialect }),
+      ...(Object.keys(options).length > 0 ? { options } : {}),
     },
   }
 }
