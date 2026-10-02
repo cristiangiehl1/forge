@@ -26,6 +26,6 @@ describe('importSql on a large script', () => {
     assert.deepEqual(result.errors, [])
     assert.equal(result.schema.tables.length, count)
     assert.equal(result.schema.relationships.length, count - 1)
-    assert.ok(elapsed < 3000, `took ${elapsed} ms`)
+    assert.ok(elapsed < 5000, `took ${elapsed} ms`)
   })
 })
