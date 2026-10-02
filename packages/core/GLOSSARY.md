@@ -33,3 +33,5 @@ The vocabulary of the domain model. Nothing here knows about the canvas.
 **Default**: a raw SQL expression on a Column, written into the DDL as it is. It excludes Generated; an empty string means none.
 
 **Comment**: free text on a Table or a Column, written as `COMMENT ON`. Blank means none.
+
+**Import**: reading a PostgreSQL script into a Schema with `importSql`. It returns the schema, the **warnings** (valid SQL that Forge does not model, each with its line) and the **errors** (a statement it should understand but cannot, a cut-off script, or a result that is not a valid Schema). It reads `CREATE TABLE`, `ALTER TABLE … ADD CONSTRAINT` / `ALTER COLUMN … SET DEFAULT` / `ADD GENERATED`, `CREATE [UNIQUE] INDEX`, `CREATE TYPE … AS ENUM`, `CREATE DOMAIN` and `COMMENT ON TABLE/COLUMN`; everything else is a warning.
