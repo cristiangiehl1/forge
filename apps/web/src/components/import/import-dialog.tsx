@@ -175,10 +175,9 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
               <>
                 <h3 className='inspector__heading'>Errors</h3>
                 <ul aria-label='Errors' className='import-dialog__list'>
-                  {shownErrors.shown.map((error, position) => (
-                    // The same error can repeat on one line, so the position is part of the key.
+                  {shownErrors.shown.map((error) => (
                     <li
-                      key={`${position}:${error.line}:${error.statement}:${error.message}`}>
+                      key={`${error.line}:${error.statement}:${error.message}`}>
                       {error.line > 0 ? `line ${error.line}: ` : ''}
                       {error.message}
                     </li>

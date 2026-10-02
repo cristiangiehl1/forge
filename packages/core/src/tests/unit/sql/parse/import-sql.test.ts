@@ -406,6 +406,13 @@ describe('importSql: an index that repeats a column', () => {
   })
 })
 
+describe('importSql: the same error twice', () => {
+  it('is reported once, like the same warning', () => {
+    const result = run('CREATE TABLE b (y); CREATE TABLE b (y);')
+    assert.equal(result.errors.length, 1)
+  })
+})
+
 describe('importSql: a script that is cut short', () => {
   it('keeps a last statement that is complete, and says only that the script is cut', () => {
     const result = run('CREATE TABLE a (x int)\n/* oops')

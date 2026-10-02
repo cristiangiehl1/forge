@@ -29,6 +29,13 @@ export function importSql(sql: string, newId: () => string): ImportResult {
   const warnings: ImportMessage[] = []
   const errors: ImportMessage[] = []
   const seen = new Set<string>()
+  const seenErrors = new Set<string>()
+  const addError = (message: ImportMessage) => {
+    const key = `${message.line}|${message.statement}|${message.message}`
+    if (seenErrors.has(key)) return
+    seenErrors.add(key)
+    errors.push(message)
+  }
   const addWarning = (message: ImportMessage) => {
     const key = `${message.line}|${message.statement}|${message.message}`
     if (seen.has(key)) return
@@ -38,7 +45,7 @@ export function importSql(sql: string, newId: () => string): ImportResult {
 
   const { tokens, errors: lexical } = tokenize(sql)
   for (const error of lexical) {
-    errors.push({ line: error.line, statement: '', message: error.message })
+    addError({ line: error.line, statement: '', message: error.message })
   }
 
   const raw = emptyScript()
@@ -67,7 +74,7 @@ export function importSql(sql: string, newId: () => string): ImportResult {
     } catch (error) {
       if (isStump && error instanceof ParseFailure) continue
       if (!(error instanceof ParseFailure)) throw error
-      errors.push({
+      addError({
         line: error.line,
         statement: preview,
         message: error.message,
@@ -79,7 +86,7 @@ export function importSql(sql: string, newId: () => string): ImportResult {
     addWarning({ line: origin.line, statement: origin.text, message })
   })
   for (const issue of validate(schema)) {
-    errors.push({ line: 0, statement: '', message: issue.message })
+    addError({ line: 0, statement: '', message: issue.message })
   }
   return { schema, warnings, errors }
 }

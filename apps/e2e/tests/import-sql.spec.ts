@@ -299,7 +299,7 @@ test.describe('importing SQL', () => {
     await expect(dialog(page)).toContainText('…and 200 more.')
   })
 
-  test('identical errors on one line do not break the list', async ({
+  test('identical errors on one line are listed once and do not break the list', async ({
     page,
   }) => {
     await openImport(page)
@@ -313,7 +313,7 @@ test.describe('importing SQL', () => {
     await sqlBox(page).fill('CREATE TABLE b (y); CREATE TABLE b (y);')
     await expect(
       dialog(page).getByRole('list', { name: 'Errors' }).locator('li')
-    ).toHaveCount(2)
+    ).toHaveCount(1)
     expect(
       problems.filter((text) => /same key|unique "key"/i.test(text))
     ).toEqual([])
