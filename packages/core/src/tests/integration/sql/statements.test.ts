@@ -18,7 +18,7 @@ describe('the statements of a script', () => {
   it('has one CREATE TABLE per table, tagged with the table it creates', () => {
     const { statements } = resultOf(usersOrders)
     assert.deepEqual(
-      statements.map((s) => [s.kind, s.tableId, s.key]),
+      statements.map((s) => [s.kind, 'tableId' in s ? s.tableId : null, s.key]),
       [
         ['create', 'users', 'create:users'],
         ['create', 'orders', 'create:orders'],
@@ -53,7 +53,9 @@ describe('the statements of a script', () => {
       ]
     )
     assert.deepEqual(
-      resultOf(schema).statements.map((s) => s.tableId),
+      resultOf(schema).statements.map((s) =>
+        'tableId' in s ? s.tableId : null
+      ),
       ['u', 'o']
     )
   })
