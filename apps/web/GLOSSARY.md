@@ -12,7 +12,7 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 
 **Inspector**: the side panel that edits the selected Table: its name and its columns. The table node itself is read-only.
 
-**Toolbar**: the strip with the project-level actions (new table, show or hide the DDL).
+**Toolbar**: the strip with the project-level actions: new table, the "New tables start with" preference, show or hide the DDL.
 
 **DDL panel**: the panel that shows the PostgreSQL DDL generated from the Schema, or the list of Issues that prevent it.
 

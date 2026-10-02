@@ -30,3 +30,11 @@ export function impliesNotNull(column: Column): boolean {
     column.generated === true && postgres.generatedImpliesNotNull(column.type)
   )
 }
+
+/**
+ * Whether the "Auto-generate" toggle is shown. It is also shown on a column that
+ * is generated on a type that cannot be (a hand-edited project), so it can be cleared.
+ */
+export function showsGeneratedToggle(column: Column): boolean {
+  return supportsGenerated(column.type) || column.generated === true
+}

@@ -173,3 +173,16 @@ describe('parseProject: generated columns', () => {
     assert.ok(parseProject(input).ok)
   })
 })
+
+describe('parseProject: several problems in one column', () => {
+  it('reports a missing name and a non-boolean generated together', () => {
+    const input = valid()
+    input.schema.tables[0].columns[0].name = undefined
+    input.schema.tables[0].columns[0].generated = 'yes'
+    // Errors that follow (the key and the relationship that used this column)
+    // are consequences of it being dropped, so only the column's own are checked.
+    const paths = errorPaths(input)
+    assert.ok(paths.includes('schema.tables[0].columns[0].name'))
+    assert.ok(paths.includes('schema.tables[0].columns[0].generated'))
+  })
+})

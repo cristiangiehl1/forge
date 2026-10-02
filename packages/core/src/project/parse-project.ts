@@ -103,15 +103,21 @@ function parseColumn(
   const id = readString(raw, 'id', path, fail)
   const name = readString(raw, 'name', path, fail)
   const type = parseType(raw.type, `${path}.type`, fail)
+  const generatedIsValid =
+    raw.generated === undefined || typeof raw.generated === 'boolean'
+  if (!generatedIsValid) {
+    fail(`${path}.generated`, '"generated" must be a boolean.')
+  }
   if (typeof raw.nullable !== 'boolean') {
     fail(`${path}.nullable`, '"nullable" must be a boolean.')
     return undefined
   }
-  if (id === undefined || name === undefined || type === undefined) {
-    return undefined
-  }
-  if (raw.generated !== undefined && typeof raw.generated !== 'boolean') {
-    fail(`${path}.generated`, '"generated" must be a boolean.')
+  if (
+    id === undefined ||
+    name === undefined ||
+    type === undefined ||
+    !generatedIsValid
+  ) {
     return undefined
   }
   return {

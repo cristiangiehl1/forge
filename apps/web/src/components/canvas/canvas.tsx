@@ -10,6 +10,11 @@ import {
   forwardEdgeChanges,
   forwardNodeChanges,
 } from '../../lib/canvas/forward-changes.ts'
+import {
+  createStabilizer,
+  sameEdge,
+  sameNode,
+} from '../../lib/canvas/stabilize.ts'
 import type { TableFlowNode } from '../../lib/canvas/to-flow.ts'
 import {
   connectionToRefs,
@@ -20,6 +25,11 @@ import { RelationshipEdge } from './relationship-edge.tsx'
 import { TableNode } from './table-node.tsx'
 
 const nodeTypes = { table: TableNode }
+
+// Keep the previous node and edge objects for whatever did not change, so React
+// Flow does not re-render every table on every keystroke in the inspector.
+const stableNodes = createStabilizer(sameNode)
+const stableEdges = createStabilizer(sameEdge)
 const edgeTypes = { relationship: RelationshipEdge }
 
 const canvasActions: CanvasActions = {
@@ -43,8 +53,10 @@ export function Canvas() {
     (state) => state.relationshipSelection
   )
 
-  const nodes = toFlowNodes(schema, view, selection)
-  const edges = toFlowEdges(schema, relationshipSelection)
+  const projectEpoch = useForgeStore((state) => state.projectEpoch)
+
+  const nodes = stableNodes(toFlowNodes(schema, view, selection))
+  const edges = stableEdges(toFlowEdges(schema, relationshipSelection))
 
   function isValidConnection(connection: Connection | Edge) {
     const refs = connectionToRefs(connection)
@@ -66,6 +78,8 @@ export function Canvas() {
   // (and kept the table), silently. Tables are removed from the inspector.
   return (
     <ReactFlow
+      // A new project starts with a fresh canvas, viewport included.
+      key={projectEpoch}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}

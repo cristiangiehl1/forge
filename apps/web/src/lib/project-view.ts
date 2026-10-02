@@ -31,6 +31,15 @@ export function nextNodePosition(existingCount: number): NodePosition {
   }
 }
 
+/** Drops the positions of tables that no longer exist. */
+export function pruneView(view: ProjectView, tableIds: string[]): ProjectView {
+  const known = new Set(tableIds)
+  const entries = Object.entries(view.nodes)
+  const kept = entries.filter(([tableId]) => known.has(tableId))
+  if (kept.length === entries.length) return view
+  return { ...view, nodes: Object.fromEntries(kept) }
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
 

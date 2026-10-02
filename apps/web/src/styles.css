@@ -6,6 +6,7 @@
   --text: #1c2330;
   --muted: #667085;
   --accent: #2f6fed;
+  --edge: #5b6b8c;
   --error-bg: #fdecec;
   --error-text: #8a1c1c;
   --warn-bg: #fff6df;
@@ -20,6 +21,7 @@
     --text: #e6e9ef;
     --muted: #9aa4b5;
     --accent: #6c9bff;
+    --edge: #9db0d6;
     --error-bg: #3a1b1b;
     --error-text: #ffb4b4;
     --warn-bg: #3a2e12;
@@ -272,4 +274,16 @@ button {
 .table-node__badge--auto {
   color: var(--muted);
   border-color: var(--muted);
+}
+
+/* Relationship lines: thick and dark enough to follow across the canvas. */
+.react-flow__edge .react-flow__edge-path {
+  stroke: var(--edge);
+  stroke-width: 2px;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path {
+  stroke: var(--accent);
+  stroke-width: 3px;
 }

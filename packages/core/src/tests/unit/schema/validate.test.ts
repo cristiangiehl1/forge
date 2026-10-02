@@ -277,3 +277,17 @@ describe('validate: generated columns', () => {
     }
   })
 })
+
+describe('validate: a relationship that points at nothing', () => {
+  it('names the relationship, so a list of problems can tell them apart', () => {
+    const schema = addRelationship(usersOrders, {
+      id: 'ghost',
+      from: { tableId: 'orders', columnId: 'gone' },
+      to: { tableId: 'users', columnId: 'u_id' },
+    })
+    const unknown = validate(schema).find(
+      (issue) => issue.code === 'relationship-unknown-column'
+    )
+    assert.equal(unknown?.relationshipId, 'ghost')
+  })
+})

@@ -154,6 +154,14 @@ export class Editor {
     }
   }
 
+  /** Deleting a table takes two clicks: the first only arms the button. */
+  async deleteSelectedTable() {
+    await this.page.getByRole('button', { name: 'Delete table' }).click()
+    await this.page
+      .getByRole('button', { name: 'Click again to delete' })
+      .click()
+  }
+
   // ---- relationships
 
   edges(): Locator {

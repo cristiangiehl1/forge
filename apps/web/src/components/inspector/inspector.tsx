@@ -1,4 +1,5 @@
 import type { Column, Table } from '@forge/core'
+import { MAX_NUMERIC_PRECISION, MAX_VARCHAR_LENGTH } from '@forge/core'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 import type { ColumnKind } from '../../lib/column-types.ts'
@@ -10,11 +11,13 @@ import {
 } from '../../lib/column-types.ts'
 import {
   impliesNotNull,
-  supportsGenerated,
+  showsGeneratedToggle,
   typeChangePatch,
 } from '../../lib/generated.ts'
 import { nextPrimaryKey } from '../../lib/primary-key.ts'
 import { relationshipsOf } from '../../lib/relationships.ts'
+import { DeleteTableButton } from './delete-table-button.tsx'
+import { NumberField } from './number-field.tsx'
 
 function ColumnRow({ table, column }: { table: Table; column: Column }) {
   const { updateColumn, removeColumn, setPrimaryKey } = forgeStore.getState()
@@ -47,47 +50,41 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
         ))}
       </select>
       {column.type.kind === 'varchar' && (
-        <input
-          aria-label='Length'
-          type='number'
-          min={1}
+        <NumberField
+          label='Length'
           value={column.type.length}
-          onChange={(event) => {
-            if (event.target.value === '') return
+          min={1}
+          max={MAX_VARCHAR_LENGTH}
+          onCommit={(length) =>
             updateColumn(table.id, column.id, {
-              type: setVarcharLength(column.type, Number(event.target.value)),
+              type: setVarcharLength(column.type, length),
             })
-          }}
+          }
         />
       )}
       {column.type.kind === 'numeric' && (
         <>
-          <input
-            aria-label='Precision'
-            type='number'
-            min={1}
+          <NumberField
+            label='Precision'
             value={column.type.precision}
-            onChange={(event) => {
-              if (event.target.value === '') return
+            min={1}
+            max={MAX_NUMERIC_PRECISION}
+            onCommit={(precision) =>
               updateColumn(table.id, column.id, {
-                type: setNumericPrecision(
-                  column.type,
-                  Number(event.target.value)
-                ),
+                type: setNumericPrecision(column.type, precision),
               })
-            }}
+            }
           />
-          <input
-            aria-label='Scale'
-            type='number'
-            min={0}
+          <NumberField
+            label='Scale'
             value={column.type.scale}
-            onChange={(event) => {
-              if (event.target.value === '') return
+            min={0}
+            max={column.type.precision}
+            onCommit={(scale) =>
               updateColumn(table.id, column.id, {
-                type: setNumericScale(column.type, Number(event.target.value)),
+                type: setNumericScale(column.type, scale),
               })
-            }}
+            }
           />
         </>
       )}
@@ -117,7 +114,7 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
         />
         NOT NULL
       </label>
-      {supportsGenerated(column.type) && (
+      {showsGeneratedToggle(column) && (
         <label>
           <input
             type='checkbox'
@@ -207,12 +204,10 @@ export function Inspector() {
         <button type='button' onClick={() => addColumn(table.id)}>
           Add column
         </button>
-        <button
-          type='button'
-          className='danger'
-          onClick={() => removeTable(table.id)}>
-          Delete table
-        </button>
+        <DeleteTableButton
+          key={table.id}
+          onConfirm={() => removeTable(table.id)}
+        />
       </div>
     </aside>
   )

@@ -95,7 +95,7 @@ test.describe('tables and columns', () => {
     await editor.connect(ORDERS_USER_ID, USERS_ID)
 
     await editor.selectTable('users')
-    await page.getByRole('button', { name: 'Delete table' }).click()
+    await editor.deleteSelectedTable()
 
     await expect(editor.tables()).toHaveCount(1)
     await expect(editor.edges()).toHaveCount(0)

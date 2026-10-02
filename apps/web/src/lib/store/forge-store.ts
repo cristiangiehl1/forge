@@ -13,7 +13,12 @@ import { createStore } from 'zustand/vanilla'
 
 import type { LoadResult } from '../../queries/project/load-project.ts'
 import type { NodePosition, ProjectView, Viewport } from '../project-view.ts'
-import { createView, nextNodePosition, parseView } from '../project-view.ts'
+import {
+  createView,
+  nextNodePosition,
+  parseView,
+  pruneView,
+} from '../project-view.ts'
 import type { AppSettings, NewTableId } from '../settings/settings.ts'
 import { DEFAULT_SETTINGS } from '../settings/settings.ts'
 
@@ -32,6 +37,8 @@ export interface ForgeState {
   relationshipSelection: RelationshipId | null
   /** App preferences: they outlive any one project. */
   settings: AppSettings
+  /** Moves on whenever a project is loaded or restarted, never while editing. */
+  projectEpoch: number
   hydrated: boolean
   persistence: PersistenceMode
   notice: StartupNotice | null
@@ -87,16 +94,11 @@ function firstFreeName(prefix: string, taken: string[]): string {
   return `${prefix}_${attempt}`
 }
 
-function nextName(prefix: string, taken: string[]): string {
-  let attempt = taken.length + 1
-  while (taken.includes(`${prefix}_${attempt}`)) attempt++
-  return `${prefix}_${attempt}`
-}
-
 export function createForgeStore({ newId }: ForgeStoreDeps) {
   return createStore<ForgeState>()((set, get) => ({
     ...emptyProject(),
     settings: DEFAULT_SETTINGS,
+    projectEpoch: 0,
     hydrated: false,
     persistence: 'ready',
     notice: null,
@@ -111,7 +113,10 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
         case 'loaded':
           set({
             schema: result.project.schema,
-            view: parseView(result.project.view),
+            view: pruneView(
+              parseView(result.project.view),
+              result.project.schema.tables.map((table) => table.id)
+            ),
             selection: null,
             relationshipSelection: null,
             hydrated: true,
@@ -139,20 +144,27 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
           set({
             ...emptyProject(),
             hydrated: true,
-            persistence: 'ready',
+            // Nothing can be saved, so do not try: one banner says so.
+            persistence: 'blocked',
             notice: { kind: 'unavailable', message: result.message },
           })
           break
       }
+      set({ projectEpoch: get().projectEpoch + 1 })
     },
 
     startNewProject: () =>
-      set({ ...emptyProject(), persistence: 'ready', notice: null }),
+      set({
+        ...emptyProject(),
+        persistence: 'ready',
+        notice: null,
+        projectEpoch: get().projectEpoch + 1,
+      }),
 
     addTable: () => {
       const { schema, view, settings } = get()
       const id = newId()
-      const name = nextName(
+      const name = firstFreeName(
         'table',
         schema.tables.map((table) => table.name)
       )
@@ -187,6 +199,7 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
 
     removeTable: (tableId) => {
       const { schema, view, selection, relationshipSelection } = get()
+      if (!schema.tables.some((table) => table.id === tableId)) return
       const { [tableId]: _removed, ...nodes } = view.nodes
       const next = core.removeTable(schema, tableId)
       set({

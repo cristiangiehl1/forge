@@ -1,4 +1,5 @@
 import { forgeStore, useForgeStore } from '../hooks/use-forge-store.ts'
+import { summarizeErrors } from '../lib/notice.ts'
 
 export function StartupNotice() {
   const notice = useForgeStore((state) => state.notice)
@@ -13,6 +14,8 @@ export function StartupNotice() {
     )
   }
 
+  const { shown, hidden } = summarizeErrors(notice.errors, 5)
+
   return (
     <div role='alert' className='banner banner--error'>
       <p>
@@ -20,13 +23,18 @@ export function StartupNotice() {
         will be saved until you start a new project.
       </p>
       <ul>
-        {notice.errors.slice(0, 5).map((error) => (
+        {shown.map((error) => (
           <li key={`${error.path}:${error.message}`}>
             {error.path ? `${error.path}: ` : ''}
             {error.message}
           </li>
         ))}
       </ul>
+      {hidden > 0 && (
+        <p>
+          …and {hidden} more {hidden === 1 ? 'problem' : 'problems'}.
+        </p>
+      )}
       <button
         type='button'
         onClick={() => forgeStore.getState().startNewProject()}>

@@ -5,6 +5,7 @@ import type { Column, ColumnType } from '@forge/core'
 
 import {
   impliesNotNull,
+  showsGeneratedToggle,
   supportsGenerated,
   typeChangePatch,
 } from '../../../lib/generated.ts'
@@ -86,5 +87,21 @@ describe('impliesNotNull', () => {
 
   it('is false for a generated column of a type that cannot be generated', () => {
     assert.equal(impliesNotNull(column({ kind: 'text' }, true)), false)
+  })
+})
+
+describe('showsGeneratedToggle', () => {
+  it('is shown for the types that can be generated', () => {
+    assert.equal(showsGeneratedToggle(column({ kind: 'integer' })), true)
+    assert.equal(showsGeneratedToggle(column({ kind: 'uuid' }, false)), true)
+  })
+
+  it('is hidden for other types', () => {
+    assert.equal(showsGeneratedToggle(column({ kind: 'text' })), false)
+    assert.equal(showsGeneratedToggle(column({ kind: 'text' }, false)), false)
+  })
+
+  it('is shown for a column that is generated on a type that cannot be, so it can be cleared', () => {
+    assert.equal(showsGeneratedToggle(column({ kind: 'text' }, true)), true)
   })
 })

@@ -25,7 +25,6 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
       <label className='toolbar__field'>
         New tables start with
         <select
-          aria-label='New tables start with'
           value={newTableId}
           onChange={(event) =>
             forgeStore

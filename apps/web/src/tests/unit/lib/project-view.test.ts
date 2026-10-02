@@ -6,6 +6,7 @@ import {
   DEFAULT_VIEWPORT,
   nextNodePosition,
   parseView,
+  pruneView,
 } from '../../../lib/project-view.ts'
 
 describe('createView', () => {
@@ -69,5 +70,26 @@ describe('parseView', () => {
     )
     assert.equal(Object.getPrototypeOf(parsed.nodes), Object.prototype)
     assert.deepEqual(Object.keys(parsed.nodes).sort(), ['__proto__', 't'])
+  })
+})
+
+describe('pruneView', () => {
+  it('keeps only the positions of tables that exist', () => {
+    const view = {
+      nodes: { a: { x: 1, y: 2 }, gone: { x: 3, y: 4 } },
+      viewport: { x: 0, y: 0, zoom: 2 },
+    }
+    assert.deepEqual(pruneView(view, ['a', 'b']), {
+      nodes: { a: { x: 1, y: 2 } },
+      viewport: { x: 0, y: 0, zoom: 2 },
+    })
+  })
+
+  it('returns the same view when nothing has to go', () => {
+    const view = {
+      nodes: { a: { x: 1, y: 2 } },
+      viewport: { x: 0, y: 0, zoom: 1 },
+    }
+    assert.equal(pruneView(view, ['a']), view)
   })
 })

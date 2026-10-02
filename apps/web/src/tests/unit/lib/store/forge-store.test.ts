@@ -101,10 +101,10 @@ describe('hydrate', () => {
     assert.deepEqual(state.schema, createSchema())
   })
 
-  it('keeps persistence on, with a notice, when storage is unavailable', () => {
+  it('blocks persistence, with a notice, when storage is unavailable', () => {
     const store = makeStore()
     store.getState().hydrate({ status: 'unavailable', message: 'blocked' })
-    assert.equal(store.getState().persistence, 'ready')
+    assert.equal(store.getState().persistence, 'blocked')
     assert.deepEqual(store.getState().notice, {
       kind: 'unavailable',
       message: 'blocked',
@@ -138,12 +138,28 @@ describe('tables', () => {
     assert.equal(state.selection, second)
   })
 
-  it('addTable skips names that are already taken', () => {
+  it('addTable uses the first free table_N, and skips names that are taken', () => {
     const store = makeStore()
     const first = store.getState().addTable()
+    store.getState().addTable()
     store.getState().renameTable(first, 'table_2')
     store.getState().addTable()
-    assert.equal(store.getState().schema.tables[1]?.name, 'table_3')
+    assert.deepEqual(
+      store.getState().schema.tables.map((table) => table.name),
+      ['table_2', 'table_2', 'table_1']
+    )
+  })
+
+  it('addTable reuses the number of a table that was removed', () => {
+    const store = makeStore()
+    const first = store.getState().addTable()
+    store.getState().addTable()
+    store.getState().removeTable(first)
+    store.getState().addTable()
+    assert.deepEqual(
+      store.getState().schema.tables.map((table) => table.name),
+      ['table_2', 'table_1']
+    )
   })
 
   it('renameTable keeps the other tables by reference', () => {
@@ -476,5 +492,68 @@ describe('the id column of a new table', () => {
     store.getState().setNewTableId('uuid')
     store.getState().startNewProject()
     assert.equal(store.getState().settings.newTableId, 'uuid')
+  })
+})
+
+describe('removing a table that does not exist', () => {
+  it('changes nothing, so nothing is autosaved', () => {
+    const store = makeStore()
+    store.getState().addTable()
+    const before = store.getState()
+    store.getState().removeTable('nope')
+    assert.equal(store.getState().schema, before.schema)
+    assert.equal(store.getState().view, before.view)
+    assert.equal(store.getState().selection, before.selection)
+  })
+})
+
+describe('node positions of tables that no longer exist', () => {
+  it('are dropped when a project is loaded', () => {
+    const store = makeStore()
+    const schema = addTable(createSchema(), { id: 't1', name: 'users' })
+    const view = {
+      nodes: { t1: { x: 1, y: 2 }, ghost: { x: 3, y: 4 } },
+      viewport: { x: 0, y: 0, zoom: 1 },
+    }
+    store.getState().hydrate({
+      status: 'loaded',
+      project: createProject(schema, view),
+    })
+    assert.deepEqual(Object.keys(store.getState().view.nodes), ['t1'])
+  })
+})
+
+describe('the project epoch', () => {
+  it('starts at 0 and moves on every time a project is loaded or restarted', () => {
+    const store = makeStore()
+    assert.equal(store.getState().projectEpoch, 0)
+    store.getState().hydrate({ status: 'empty' })
+    assert.equal(store.getState().projectEpoch, 1)
+    store.getState().startNewProject()
+    assert.equal(store.getState().projectEpoch, 2)
+  })
+
+  it('does not move while the user edits', () => {
+    const store = makeStore()
+    store.getState().hydrate({ status: 'empty' })
+    store.getState().addTable()
+    store.getState().setViewport({ x: 5, y: 5, zoom: 2 })
+    assert.equal(store.getState().projectEpoch, 1)
+  })
+})
+
+describe('column names', () => {
+  it('a new column takes the first free column_N, whatever the table already has', () => {
+    const store = makeStore()
+    const table = store.getState().addTable()
+    const first = store.getState().addColumn(table)
+    const second = store.getState().addColumn(table)
+    store.getState().updateColumn(table, first ?? '', { name: 'a' })
+    store.getState().updateColumn(table, second ?? '', { name: 'b' })
+    store.getState().addColumn(table)
+    assert.deepEqual(
+      store.getState().schema.tables[0]?.columns.map((column) => column.name),
+      ['a', 'b', 'column_1']
+    )
   })
 })
