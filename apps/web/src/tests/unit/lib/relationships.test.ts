@@ -3,7 +3,7 @@ import { describe, it } from 'node:test'
 
 import type { Schema } from '@forge/core'
 
-import { relationshipsOf } from '../../../lib/relationships.ts'
+import { relatedTables, relationshipsOf } from '../../../lib/relationships.ts'
 
 const schema: Schema = {
   version: 1,
@@ -69,5 +69,51 @@ describe('relationshipsOf', () => {
     assert.deepEqual(relationshipsOf(blank, 'o'), [
       { id: 'r1', label: '(unnamed).(unnamed) → users.id' },
     ])
+  })
+})
+
+describe('relatedTables', () => {
+  it('includes the table a table references, and the tables that reference it', () => {
+    assert.deepEqual([...relatedTables(schema, 'o')], ['u'])
+    assert.deepEqual([...relatedTables(schema, 'u')], ['o'])
+  })
+
+  it('is empty for a table without relationships or an unknown one', () => {
+    assert.equal(relatedTables(schema, 'x').size, 0)
+    assert.equal(relatedTables(schema, 'nope').size, 0)
+  })
+
+  it('does not count a self-reference as related', () => {
+    const selfRef: Schema = {
+      ...schema,
+      relationships: [
+        {
+          id: 'r2',
+          from: { tableId: 'u', columnId: 'u1' },
+          to: { tableId: 'u', columnId: 'u1' },
+        },
+      ],
+    }
+    assert.equal(relatedTables(selfRef, 'u').size, 0)
+  })
+
+  it('collapses several relationships to the same table', () => {
+    const twice: Schema = {
+      ...schema,
+      relationships: [
+        ...schema.relationships,
+        {
+          id: 'r3',
+          from: { tableId: 'o', columnId: 'o1' },
+          to: { tableId: 'u', columnId: 'u1' },
+        },
+        {
+          id: 'r4',
+          from: { tableId: 'u', columnId: 'u1' },
+          to: { tableId: 'o', columnId: 'o1' },
+        },
+      ],
+    }
+    assert.deepEqual([...relatedTables(twice, 'o')], ['u'])
   })
 })

@@ -34,3 +34,14 @@ export function relationshipsOf(
   }
   return summaries
 }
+
+/** The other tables a table is directly related to, as the referencing or the referenced side. */
+export function relatedTables(schema: Schema, tableId: TableId): Set<TableId> {
+  const related = new Set<TableId>()
+  for (const { from, to } of schema.relationships) {
+    if (from.tableId === to.tableId) continue
+    if (from.tableId === tableId) related.add(to.tableId)
+    else if (to.tableId === tableId) related.add(from.tableId)
+  }
+  return related
+}
