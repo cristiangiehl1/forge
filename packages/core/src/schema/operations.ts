@@ -253,11 +253,37 @@ export function typeUsages(schema: Schema, typeId: TypeId): TypeUsage[] {
     }
   }
   for (const type of schema.types ?? []) {
-    if (type.kind === 'domain' && userTypeIdsOf(type.base).includes(typeId)) {
+    if (
+      type.kind === 'domain' &&
+      type.id !== typeId &&
+      userTypeIdsOf(type.base).includes(typeId)
+    ) {
       usages.push({ kind: 'domain', typeId: type.id })
     }
   }
   return usages
+}
+
+/** Whether a type is, directly or through domains, based on `targetId`. */
+export function typeDependsOn(
+  schema: Schema,
+  typeId: TypeId,
+  targetId: TypeId
+): boolean {
+  const visited = new Set<TypeId>()
+  const queue = [typeId]
+  while (queue.length > 0) {
+    const currentId = queue.pop()
+    const current = schema.types?.find((type) => type.id === currentId)
+    if (current?.kind !== 'domain') continue
+    for (const id of userTypeIdsOf(current.base)) {
+      if (id === targetId) return true
+      if (visited.has(id)) continue
+      visited.add(id)
+      queue.push(id)
+    }
+  }
+  return false
 }
 
 /** A type that is still used stays: the schema comes back unchanged. */

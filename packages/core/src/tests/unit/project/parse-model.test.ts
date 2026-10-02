@@ -220,3 +220,44 @@ describe('parseProject: types', () => {
       )
   })
 })
+
+describe('parseProject: duplicate ids', () => {
+  it('rejects two types with the same id', () => {
+    const enumType = { kind: 'enum', id: 'e', name: 'a', values: ['x'] }
+    const result = parseProject(
+      project(schema({ types: [enumType, { ...enumType, name: 'b' }] }))
+    )
+    assert.equal(result.ok, false)
+    if (!result.ok) {
+      assert.ok(
+        result.errors.some((error) => error.path === 'schema.types[1].id')
+      )
+    }
+  })
+
+  it('rejects two indexes with the same id, even on different tables', () => {
+    const index = (name: string) => ({
+      id: 'i',
+      name,
+      columns: ['c1'],
+      unique: false,
+      method: 'btree',
+    })
+    const result = parseProject(
+      project(
+        schema({}, [
+          table({ indexes: [index('a')] }),
+          { ...table({ indexes: [index('b')] }), id: 'u', name: 'other' },
+        ])
+      )
+    )
+    assert.equal(result.ok, false)
+    if (!result.ok) {
+      assert.ok(
+        result.errors.some(
+          (error) => error.path === 'schema.tables[1].indexes[0].id'
+        )
+      )
+    }
+  })
+})

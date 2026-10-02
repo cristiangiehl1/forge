@@ -10,6 +10,7 @@ import type {
   Table,
   TableId,
   TypeId,
+  UserType,
 } from './types.ts'
 import { GENERATED_COLUMN_KINDS } from './types.ts'
 
@@ -31,6 +32,7 @@ export type IssueCode =
   | 'enum-empty-value'
   | 'enum-duplicate-value'
   | 'unknown-type'
+  | 'type-cycle'
   | 'multiple-relationships-from-column'
   | 'relationship-unknown-column'
   | 'relationship-type-mismatch'
@@ -293,6 +295,24 @@ export function validate(schema: Schema): Issue[] {
     if (found) issues.push(found)
   }
 
+  // A domain is in a cycle when following its base types leads back to it.
+  const inCycle = (start: UserType): boolean => {
+    const visited = new Set<string>()
+    const queue = [start]
+    while (queue.length > 0) {
+      const current = queue.pop()
+      if (current?.kind !== 'domain') continue
+      for (const id of userTypeIdsOf(current.base)) {
+        if (id === start.id) return true
+        if (visited.has(id)) continue
+        visited.add(id)
+        const next = types.find((candidate) => candidate.id === id)
+        if (next) queue.push(next)
+      }
+    }
+    return false
+  }
+
   const seenTypeNames = new Set<string>()
   for (const userType of types) {
     const ids = { typeId: userType.id }
@@ -339,6 +359,14 @@ export function validate(schema: Schema): Issue[] {
         }
         seenValues.add(value)
       }
+    } else if (inCycle(userType)) {
+      issues.push(
+        issue(
+          'type-cycle',
+          `Domain "${userType.name}" is based on itself, directly or through other domains.`,
+          ids
+        )
+      )
     } else if (userTypeIdsOf(userType.base).some((id) => !typeIds.has(id))) {
       issues.push(
         issue(

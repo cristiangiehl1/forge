@@ -20,6 +20,7 @@ export {
   renameTable,
   setPrimaryKey,
   setTableComment,
+  typeDependsOn,
   typeUsages,
   updateColumn,
   updateIndex,

@@ -226,3 +226,33 @@ describe('validate: relationships between user types', () => {
     )
   })
 })
+
+describe('validate: domain cycles', () => {
+  const domain = (id: string, base: string): UserType => ({
+    kind: 'domain',
+    id,
+    name: id,
+    base: { kind: 'user', typeId: base },
+  })
+
+  it('flags a domain based on itself and two domains based on each other', () => {
+    assert.deepEqual(codes(schemaOf([], [domain('a', 'a')])), ['type-cycle'])
+    assert.deepEqual(
+      codes(schemaOf([], [domain('a', 'b'), domain('b', 'a')])),
+      ['type-cycle', 'type-cycle']
+    )
+  })
+
+  it('accepts a chain of domains that ends', () => {
+    const base: UserType = {
+      kind: 'domain',
+      id: 'c',
+      name: 'c',
+      base: { kind: 'text' },
+    }
+    assert.deepEqual(
+      codes(schemaOf([], [domain('a', 'b'), domain('b', 'c'), base])),
+      []
+    )
+  })
+})

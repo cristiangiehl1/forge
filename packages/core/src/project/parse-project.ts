@@ -186,7 +186,8 @@ function parseTable(
   raw: unknown,
   path: string,
   fail: Fail,
-  typeIds: ReadonlySet<string>
+  typeIds: ReadonlySet<string>,
+  indexIds: Set<string>
 ): Table | undefined {
   if (!isRecord(raw)) {
     fail(path, 'A table must be an object.')
@@ -230,7 +231,13 @@ function parseTable(
   })
 
   const comment = readOptionalString(raw, 'comment', path, fail)
-  const indexes = parseIndexes(raw.indexes, `${path}.indexes`, columnIds, fail)
+  const indexes = parseIndexes(
+    raw.indexes,
+    `${path}.indexes`,
+    columnIds,
+    indexIds,
+    fail
+  )
 
   if (id === undefined || name === undefined) return undefined
   return {
@@ -247,6 +254,7 @@ function parseIndexes(
   raw: unknown,
   path: string,
   columnIds: ReadonlySet<string>,
+  indexIds: Set<string>,
   fail: Fail
 ): Index[] | undefined {
   if (raw === undefined) return undefined
@@ -262,6 +270,11 @@ function parseIndexes(
       return
     }
     const id = readString(rawIndex, 'id', indexPath, fail)
+    if (id !== undefined && indexIds.has(id)) {
+      fail(`${indexPath}.id`, `Duplicate index id "${id}".`)
+      return
+    }
+    if (id !== undefined) indexIds.add(id)
     const name = readString(rawIndex, 'name', indexPath, fail)
     const columns: string[] = []
     if (!Array.isArray(rawIndex.columns)) {
@@ -319,6 +332,7 @@ function parseTypes(
     return undefined
   }
   const types: UserType[] = []
+  const seenIds = new Set<string>()
   raw.forEach((rawType: unknown, position: number) => {
     const typePath = `${path}[${position}]`
     if (!isRecord(rawType)) {
@@ -326,6 +340,11 @@ function parseTypes(
       return
     }
     const id = readString(rawType, 'id', typePath, fail)
+    if (id !== undefined && seenIds.has(id)) {
+      fail(`${typePath}.id`, `Duplicate type id "${id}".`)
+      return
+    }
+    if (id !== undefined) seenIds.add(id)
     const name = readString(rawType, 'name', typePath, fail)
     if (rawType.kind === 'enum') {
       if (!Array.isArray(rawType.values)) {
@@ -439,11 +458,12 @@ function parseSchema(
   }
   const types = parseTypes(raw.types, `${path}.types`, typeIds, fail)
 
+  const indexIds = new Set<string>()
   const tables: Table[] = []
   const tableIds = new Set<string>()
   raw.tables.forEach((rawTable: unknown, index: number) => {
     const tablePath = `${path}.tables[${index}]`
-    const table = parseTable(rawTable, tablePath, fail, typeIds)
+    const table = parseTable(rawTable, tablePath, fail, typeIds, indexIds)
     if (!table) return
     if (tableIds.has(table.id)) {
       fail(`${tablePath}.id`, `Duplicate table id "${table.id}".`)

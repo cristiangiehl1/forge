@@ -1,5 +1,5 @@
 import type { Schema, UserType } from '@forge/core'
-import { typeUsages } from '@forge/core'
+import { typeDependsOn, typeUsages } from '@forge/core'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 import {
@@ -29,7 +29,10 @@ function describeUsages(schema: Schema, typeId: string): string[] {
 function TypeRow({ type, schema }: { type: UserType; schema: Schema }) {
   const { updateType, removeType } = forgeStore.getState()
   const usedBy = describeUsages(schema, type.id)
-  const others = (schema.types ?? []).filter((other) => other.id !== type.id)
+  // A domain cannot be based on itself, nor on a type that is based on it.
+  const others = (schema.types ?? []).filter(
+    (other) => other.id !== type.id && !typeDependsOn(schema, other.id, type.id)
+  )
 
   return (
     <li className='type-row'>

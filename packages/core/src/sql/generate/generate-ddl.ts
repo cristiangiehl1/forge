@@ -296,7 +296,7 @@ export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
       if (!present(column.comment)) continue
       statements.push({
         kind: 'comment',
-        key: `comment:column:${column.id}`,
+        key: `comment:column:${table.id}:${column.id}`,
         tableId: table.id,
         sql: `COMMENT ON COLUMN ${quote(table.name)}.${quote(column.name)} IS ${dialect.quoteLiteral(column.comment)};`,
       })

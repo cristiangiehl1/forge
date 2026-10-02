@@ -12,6 +12,7 @@ import {
   removeTable,
   removeType,
   setTableComment,
+  typeDependsOn,
   typeUsages,
   updateIndex,
   updateType,
@@ -178,5 +179,36 @@ describe('user types', () => {
     const s = addType(base(), colour)
     assert.equal(updateType(s, { ...colour, id: 'nope' }), s)
     assert.equal(removeType(s, 'nope'), s)
+  })
+})
+
+describe('typeDependsOn and a self-based domain', () => {
+  const domain = (id: string, base: string): UserType => ({
+    kind: 'domain',
+    id,
+    name: id,
+    base: { kind: 'user', typeId: base },
+  })
+
+  it('follows domains transitively', () => {
+    let s = addType(base(), { kind: 'enum', id: 'e', name: 'e', values: ['x'] })
+    s = addType(s, domain('d1', 'e'))
+    s = addType(s, domain('d2', 'd1'))
+    assert.equal(typeDependsOn(s, 'd2', 'e'), true)
+    assert.equal(typeDependsOn(s, 'd1', 'e'), true)
+    assert.equal(typeDependsOn(s, 'e', 'd2'), false)
+    assert.equal(typeDependsOn(s, 'e', 'e'), false)
+  })
+
+  it('terminates on a cycle', () => {
+    const s = addType(addType(base(), domain('a', 'b')), domain('b', 'a'))
+    assert.equal(typeDependsOn(s, 'a', 'b'), true)
+    assert.equal(typeDependsOn(s, 'a', 'zzz'), false)
+  })
+
+  it('does not count a domain based on itself as using itself, so it can be removed', () => {
+    const s = addType(base(), domain('a', 'a'))
+    assert.deepEqual(typeUsages(s, 'a'), [])
+    assert.deepEqual(removeType(s, 'a').types, [])
   })
 })

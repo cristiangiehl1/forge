@@ -304,3 +304,15 @@ describe('generateDdl: the order of the whole script', () => {
     )
   })
 })
+
+describe('generateDdl: statement keys', () => {
+  it('are unique even when two tables reuse a column id', () => {
+    const commented = (id: string, name: string) =>
+      tbl(id, name, [col('c', 'a', { kind: 'text' }, { comment: 'x' })])
+    const { statements } = run(
+      schemaOf([commented('t1', 'one'), commented('t2', 'two')])
+    )
+    const keys = statements.map((statement) => statement.key)
+    assert.equal(new Set(keys).size, keys.length)
+  })
+})
