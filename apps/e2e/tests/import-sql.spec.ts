@@ -67,7 +67,7 @@ test.describe('importing SQL', () => {
       .getByRole('button', { name: 'Import', exact: true })
       .click()
 
-    await expect(dialog(page)).toHaveCount(0)
+    await expect(page.locator('dialog.import-dialog')).toHaveCount(0)
     await expect(editor.tables()).toHaveCount(2)
     await expect(editor.edges()).toHaveCount(1)
     const left = async (name: string) =>
@@ -120,6 +120,7 @@ test.describe('importing SQL', () => {
     writeFileSync(file, 'CREATE TABLE from_file (id int PRIMARY KEY);')
     await page.getByRole('button', { name: 'Import SQL' }).click()
     await dialog(page).getByLabel('SQL file').setInputFiles(file)
+    await expect(sqlBox(page)).toHaveValue(/from_file/)
     await expect(
       dialog(page).getByRole('region', { name: 'Import preview' })
     ).toContainText('1 table')
@@ -210,9 +211,9 @@ test.describe('importing SQL', () => {
     await editor.defineTable('users', [
       { name: 'id', type: 'integer', primaryKey: true },
     ])
-    const before =
-      (await editor.node('users').locator('.table-node').boundingBox())?.x ??
-      NaN
+    // Where the table sits on the canvas (flow space, not screen space: the
+    // import fits the view, so screen coordinates move).
+    const before = await editor.position('users')
 
     await page.getByRole('button', { name: 'Import SQL' }).click()
     await sqlBox(page).fill(
@@ -233,7 +234,7 @@ test.describe('importing SQL', () => {
       (await editor.node('items').locator('.table-node').boundingBox())?.x ??
       NaN
     expect(added).toBeGreaterThan(first)
-    expect(before).toBeGreaterThan(-1)
+    expect(await editor.position('users')).toBe(before)
   })
 
   test('replacing the project needs a second click, and then only the script remains', async ({
@@ -264,10 +265,10 @@ test.describe('importing SQL', () => {
     await page.getByRole('button', { name: 'Import SQL' }).click()
     await sqlBox(page).fill('CREATE TABLE nope (id int);')
     await dialog(page).getByRole('button', { name: 'Cancel' }).click()
-    await expect(dialog(page)).toHaveCount(0)
+    await expect(page.locator('dialog.import-dialog')).toHaveCount(0)
     await page.getByRole('button', { name: 'Import SQL' }).click()
     await page.keyboard.press('Escape')
-    await expect(dialog(page)).toHaveCount(0)
+    await expect(page.locator('dialog.import-dialog')).toHaveCount(0)
     await expect(editor.tables()).toHaveCount(1)
   })
 
@@ -296,5 +297,58 @@ test.describe('importing SQL', () => {
     const warnings = dialog(page).getByRole('list', { name: 'Warnings' })
     await expect(warnings.locator('li')).toHaveCount(100)
     await expect(dialog(page)).toContainText('…and 200 more.')
+  })
+
+  test('identical errors on one line do not break the list', async ({
+    page,
+  }) => {
+    await openImport(page)
+    const problems: string[] = []
+    page.on('console', (message) => {
+      if (message.type() === 'error' || message.type() === 'warning') {
+        problems.push(message.text())
+      }
+    })
+    await page.getByRole('button', { name: 'Import SQL' }).click()
+    await sqlBox(page).fill('CREATE TABLE b (y); CREATE TABLE b (y);')
+    await expect(
+      dialog(page).getByRole('list', { name: 'Errors' }).locator('li')
+    ).toHaveCount(2)
+    expect(
+      problems.filter((text) => /same key|unique "key"/i.test(text))
+    ).toEqual([])
+  })
+
+  test('a project that has only types still offers Add or Replace', async ({
+    page,
+  }) => {
+    const editor = await openImport(page)
+    await page.getByRole('button', { name: 'Add enum' }).click()
+    await expect(editor.tables()).toHaveCount(0)
+    await page.getByRole('button', { name: 'Import SQL' }).click()
+    await sqlBox(page).fill("CREATE TYPE type_1 AS ENUM ('a');")
+    await expect(dialog(page).getByLabel('Add to the project')).toBeVisible()
+    await expect(dialog(page).getByLabel('Replace the project')).toBeVisible()
+  })
+
+  test('the same file can be loaded again after its text was changed', async ({
+    page,
+  }) => {
+    await openImport(page)
+    const file = path.join(
+      mkdtempSync(path.join(tmpdir(), 'forge-')),
+      'again.sql'
+    )
+    writeFileSync(file, 'CREATE TABLE again (id int);')
+    await page.getByRole('button', { name: 'Import SQL' }).click()
+    await dialog(page).getByLabel('SQL file').setInputFiles(file)
+    await expect(sqlBox(page)).toHaveValue(/again/)
+    await sqlBox(page).fill('')
+    await expect(sqlBox(page)).toHaveValue('')
+    writeFileSync(file, 'CREATE TABLE again (id int, more int);')
+    await dialog(page).getByLabel('SQL file').setInputFiles(file)
+    await expect(sqlBox(page)).toHaveValue(/more int/)
+    // The input forgets its file once it was read, so choosing it again is a change.
+    await expect(dialog(page).getByLabel('SQL file')).toHaveValue('')
   })
 })

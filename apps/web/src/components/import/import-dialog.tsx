@@ -31,7 +31,11 @@ function parse(text: string): Parsed | null {
 const PARSE_DELAY_MS = 300
 
 export function ImportDialog({ onClose }: { onClose: () => void }) {
-  const hasTables = useForgeStore((state) => state.schema.tables.length > 0)
+  // A project that has only types is not empty either: the store merges into it.
+  const hasContent = useForgeStore(
+    (state) =>
+      state.schema.tables.length > 0 || (state.schema.types ?? []).length > 0
+  )
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<Parsed | null>(null)
   // The preview lags the text by the debounce; Import waits for it to catch up.
@@ -95,7 +99,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     summary !== null &&
     errors.length === 0 &&
     !isEmptyImport(summary)
-  const replacing = hasTables && mode === 'replace'
+  const replacing = hasContent && mode === 'replace'
 
   function run() {
     if (!parsed || !canImport) return
@@ -142,7 +146,14 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           type='file'
           accept='.sql,text/plain'
           aria-label='SQL file'
-          onChange={(event) => loadFile(event.target.files?.[0])}
+          onChange={(event) => {
+            const input = event.target
+            const file = input.files?.[0]
+            // Forget the file once it is taken: choosing the same one again,
+            // after it changed on disk, is then a change the browser reports.
+            input.value = ''
+            loadFile(file)
+          }}
         />
       </label>
       {fileError && (
@@ -164,9 +175,10 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
               <>
                 <h3 className='inspector__heading'>Errors</h3>
                 <ul aria-label='Errors' className='import-dialog__list'>
-                  {shownErrors.shown.map((error) => (
+                  {shownErrors.shown.map((error, position) => (
+                    // The same error can repeat on one line, so the position is part of the key.
                     <li
-                      key={`${error.line}:${error.statement}:${error.message}`}>
+                      key={`${position}:${error.line}:${error.statement}:${error.message}`}>
                       {error.line > 0 ? `line ${error.line}: ` : ''}
                       {error.message}
                     </li>
@@ -203,9 +215,9 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
         )}
       </section>
 
-      {hasTables && (
+      {hasContent && (
         <fieldset className='import-dialog__mode'>
-          <legend>The project already has tables</legend>
+          <legend>The project already has content</legend>
           <label>
             <input
               type='radio'
