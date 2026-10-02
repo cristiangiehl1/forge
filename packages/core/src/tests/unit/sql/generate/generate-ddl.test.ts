@@ -16,6 +16,7 @@ describe('generateDdl', () => {
     assert.deepEqual(generateDdl(schemaOf([]), postgres), {
       ok: true,
       sql: '',
+      statements: [],
     })
   })
 })

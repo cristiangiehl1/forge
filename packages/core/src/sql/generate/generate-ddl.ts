@@ -4,8 +4,23 @@ import type { Issue } from '../../schema/validate.ts'
 import { validate } from '../../schema/validate.ts'
 import { uniqueName } from './constraint-names.ts'
 
+/**
+ * One statement of the script, and whose it is: a `create` belongs to the table it
+ * creates, an `alter` to the table that holds the foreign key it adds. A UI uses
+ * that to show which part of the script a table is.
+ */
+export type DdlStatement =
+  | { kind: 'create'; key: string; tableId: string; sql: string }
+  | {
+      kind: 'alter'
+      key: string
+      tableId: string
+      relationshipId: string
+      sql: string
+    }
+
 export type GenerateResult =
-  | { ok: true; sql: string }
+  | { ok: true; sql: string; statements: DdlStatement[] }
   | { ok: false; issues: Issue[] }
 
 function requireTable(schema: Schema, tableId: string): Table {
@@ -157,15 +172,28 @@ export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
 
   const { planned, deferred } = planTables(schema)
   const usedNames = new Set<string>()
-  const statements = planned.map(({ table, inline }) =>
-    createTable(schema, table, inline, dialect, usedNames)
-  )
+  const statements: DdlStatement[] = planned.map(({ table, inline }) => ({
+    kind: 'create',
+    key: `create:${table.id}`,
+    tableId: table.id,
+    sql: createTable(schema, table, inline, dialect, usedNames),
+  }))
   for (const relationship of deferred) {
-    statements.push(addForeignKey(schema, relationship, dialect, usedNames))
+    statements.push({
+      kind: 'alter',
+      key: `alter:${relationship.id}`,
+      tableId: relationship.from.tableId,
+      relationshipId: relationship.id,
+      sql: addForeignKey(schema, relationship, dialect, usedNames),
+    })
   }
 
   return {
     ok: true,
-    sql: statements.length === 0 ? '' : `${statements.join('\n\n')}\n`,
+    sql:
+      statements.length === 0
+        ? ''
+        : `${statements.map((statement) => statement.sql).join('\n\n')}\n`,
+    statements,
   }
 }

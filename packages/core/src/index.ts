@@ -36,5 +36,8 @@ export {
 } from './schema/types.ts'
 export type { Issue, IssueCode } from './schema/validate.ts'
 export { checkRelationship, validate } from './schema/validate.ts'
-export type { GenerateResult } from './sql/generate/generate-ddl.ts'
+export type {
+  DdlStatement,
+  GenerateResult,
+} from './sql/generate/generate-ddl.ts'
 export { generateDdl } from './sql/generate/generate-ddl.ts'
