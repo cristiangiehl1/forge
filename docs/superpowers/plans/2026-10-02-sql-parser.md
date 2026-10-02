@@ -152,7 +152,7 @@ describe('tokenize: comments, meta-commands and COPY data', () => {
       result.tokens.map((t) => t.value),
       ['copy', 't', '(', 'a', ')', 'from', 'stdin', ';', 'select', '2', ';']
     )
-    assert.equal(result.tokens.find((t) => t.value === 'select')?.line, 7)
+    assert.equal(result.tokens.find((t) => t.value === 'select')?.line, 6)
   })
 
   it('does not skip anything for a COPY that is not from stdin', () => {
