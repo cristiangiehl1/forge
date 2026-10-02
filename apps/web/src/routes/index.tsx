@@ -8,6 +8,7 @@ import { StartupNotice } from '../components/startup-notice.tsx'
 import { Toolbar } from '../components/toolbar/toolbar.tsx'
 import { useAutosave } from '../hooks/use-autosave.ts'
 import { forgeStore, useForgeStore } from '../hooks/use-forge-store.ts'
+import { useHistoryShortcuts } from '../hooks/use-history-shortcuts.ts'
 import { useLoadProject } from '../queries/project/use-load-project.ts'
 
 export const Route = createFileRoute('/')({
@@ -29,6 +30,7 @@ function EditorPage() {
 }
 
 function Editor() {
+  useHistoryShortcuts()
   const [ddlOpen, setDdlOpen] = useState(false)
   const saveError = useAutosave()
 

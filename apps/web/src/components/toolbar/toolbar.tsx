@@ -1,6 +1,7 @@
 import { useState } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
+import { canRedo, canUndo } from '../../lib/history/history.ts'
 import type { NewTableId } from '../../lib/settings/settings.ts'
 import { NEW_TABLE_ID_CHOICES } from '../../lib/settings/settings.ts'
 import { ConfirmButton } from '../confirm-button.tsx'
@@ -19,6 +20,8 @@ const NEW_TABLE_ID_LABELS: Record<NewTableId, string> = {
 
 export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
   const [importing, setImporting] = useState(false)
+  const undoable = useForgeStore((state) => canUndo(state.history))
+  const redoable = useForgeStore((state) => canRedo(state.history))
   const newTableId = useForgeStore((state) => state.settings.newTableId)
   const newTableTimestamps = useForgeStore(
     (state) => state.settings.newTableTimestamps
@@ -28,6 +31,20 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
   return (
     <header className='toolbar'>
       <h1 className='toolbar__title'>Forge</h1>
+      <button
+        type='button'
+        disabled={!undoable}
+        title='Undo (Ctrl+Z)'
+        onClick={() => forgeStore.getState().undo()}>
+        Undo
+      </button>
+      <button
+        type='button'
+        disabled={!redoable}
+        title='Redo (Ctrl+Shift+Z)'
+        onClick={() => forgeStore.getState().redo()}>
+        Redo
+      </button>
       <button type='button' onClick={() => forgeStore.getState().addTable()}>
         New table
       </button>
