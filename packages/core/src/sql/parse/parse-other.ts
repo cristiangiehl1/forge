@@ -24,8 +24,8 @@ function skipAction(cursor: Cursor): void {
   while (!cursor.done) {
     const token = cursor.peek() as Token
     if (token.kind === 'symbol') {
-      if (token.value === '(') depth++
-      else if (token.value === ')') depth--
+      if (token.value === '(' || token.value === '[') depth++
+      else if (token.value === ')' || token.value === ']') depth--
       else if (token.value === ',' && depth === 0) return
     }
     cursor.next()

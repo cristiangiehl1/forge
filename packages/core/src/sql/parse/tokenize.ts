@@ -59,6 +59,7 @@ export function tokenize(sql: string): { tokens: Token[]; errors: LexError[] } {
     value: string,
     startLine: number
   ) => {
+    const previous = tokens[tokens.length - 1]
     const token: Token = {
       kind,
       text: sql.slice(start, end),
@@ -69,7 +70,9 @@ export function tokenize(sql: string): { tokens: Token[]; errors: LexError[] } {
     }
     tokens.push(token)
     first ??= token
-    if (kind === 'word' && value === 'stdin') sawStdin = true
+    if (kind === 'word' && value === 'stdin' && previous?.value === 'from') {
+      sawStdin = true
+    }
     return token
   }
 
@@ -262,6 +265,12 @@ export function tokenize(sql: string): { tokens: Token[]; errors: LexError[] } {
     if (c === ';') {
       if (first?.value === 'copy' && sawStdin) {
         const end = sql.indexOf('\n\\.', i)
+        if (end === -1) {
+          errors.push({
+            line,
+            message: 'COPY data is never ended by a line with "\\.".',
+          })
+        }
         const stop = end === -1 ? length : end + 3
         countLines(i, stop)
         i = stop

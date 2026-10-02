@@ -197,6 +197,23 @@ describe('CREATE DOMAIN', () => {
   })
 })
 
+describe('brackets in a default', () => {
+  it('keeps a comma inside brackets in ALTER COLUMN SET DEFAULT and in a domain default', () => {
+    const { raw, warnings, failures } = parseScript(`
+      ALTER TABLE t ALTER COLUMN a SET DEFAULT ARRAY['x', 'y'];
+      CREATE DOMAIN d AS text[] DEFAULT ARRAY['x', 'y'];`)
+    assert.deepEqual(failures, [])
+    assert.deepEqual(warnings, [])
+    const alter = raw.alters[0]
+    assert.deepEqual(alter && 'setDefault' in alter && alter.setDefault, {
+      column: 'a',
+      expression: "ARRAY['x', 'y']",
+    })
+    const domain = raw.types[0]
+    assert.equal(domain?.kind === 'domain' && domain.default, "ARRAY['x', 'y']")
+  })
+})
+
 describe('COMMENT ON', () => {
   it('reads table and column comments, with or without a schema', () => {
     const { raw, failures, warnings } = parseScript(`

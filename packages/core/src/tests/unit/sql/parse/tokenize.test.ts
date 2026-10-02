@@ -117,6 +117,23 @@ describe('tokenize: comments, meta-commands and COPY data', () => {
   })
 })
 
+describe('tokenize: COPY data is only skipped for FROM stdin', () => {
+  it('does not skip anything when stdin is only a name', () => {
+    const sql =
+      "CREATE TABLE t (a int, stdin int);\nCOPY t (a, stdin) TO '/tmp/x';\nCREATE TABLE u (b int);"
+    assert.equal(
+      tokenize(sql).tokens.filter((t) => t.value === 'create').length,
+      2
+    )
+  })
+
+  it('reports data that is never ended by \\.', () => {
+    const { errors } = tokenize('COPY t (a) FROM stdin;\n1\n2\n')
+    assert.equal(errors.length, 1)
+    assert.equal(errors[0]?.line, 1)
+  })
+})
+
 describe('tokenize: truncated input', () => {
   it('reports an unterminated string, identifier, dollar quote and comment with their line', () => {
     for (const sql of [

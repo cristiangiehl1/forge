@@ -130,6 +130,20 @@ describe('CREATE TABLE: column constraints', () => {
   })
 })
 
+describe('CREATE TABLE: brackets in a DEFAULT', () => {
+  it('keeps a comma inside brackets as part of the expression', () => {
+    const sql = `CREATE TABLE t (
+      a text[] DEFAULT ARRAY['a'::text, 'b'::text],
+      b int[] DEFAULT ARRAY[NULL]::int[] NOT NULL,
+      c int
+    )`
+    assert.equal(column(sql, 'a').default, "ARRAY['a'::text, 'b'::text]")
+    assert.equal(column(sql, 'b').default, 'ARRAY[NULL]::int[]')
+    assert.equal(column(sql, 'b').notNull, true)
+    assert.equal(tableOf(sql).table.columns.length, 3)
+  })
+})
+
 describe('CREATE TABLE: table constraints', () => {
   const sql = `CREATE TABLE t (
     a int, b int, c int,

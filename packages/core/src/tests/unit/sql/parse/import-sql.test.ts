@@ -131,6 +131,13 @@ describe('importSql: generated columns and defaults', () => {
     assert.equal(column(sql, 'c').generated, undefined)
   })
 
+  it('keeps a now() default with a cast to anything but a timestamp as a raw default', () => {
+    const sql = `CREATE TABLE t (a timestamptz DEFAULT now()::date, b timestamptz DEFAULT now()::timestamp with time zone)`
+    assert.equal(column(sql, 'a').generated, undefined)
+    assert.equal(column(sql, 'a').default, 'now()::date')
+    assert.equal(column(sql, 'b').generated, true)
+  })
+
   it('imports a smallint serial as a plain smallint NOT NULL, with a warning', () => {
     const result = run('CREATE TABLE t (a smallserial)')
     const found = result.schema.tables[0]?.columns[0]

@@ -1,15 +1,12 @@
-import {
-  addColumn,
-  addIndex,
-  addRelationship,
-  addTable,
-  addType,
-  createSchema,
-  setPrimaryKey,
-  setTableComment,
-  updateColumn,
-} from '../../schema/operations.ts'
-import type { ColumnType, Schema } from '../../schema/types.ts'
+import type {
+  Column,
+  ColumnType,
+  Index,
+  Relationship,
+  Schema,
+  Table,
+  UserType,
+} from '../../schema/types.ts'
 import { GENERATED_COLUMN_KINDS } from '../../schema/types.ts'
 import { checkRelationship } from '../../schema/validate.ts'
 import type {
@@ -24,14 +21,16 @@ import type {
 export type BuildWarn = (origin: Origin, message: string) => void
 
 const NOW_DEFAULT =
-  /^(now\(\)|current_timestamp(\(\d*\))?|transaction_timestamp\(\)|statement_timestamp\(\)|clock_timestamp\(\))(::[a-z ]+)?$/
+  /^(now\(\)|current_timestamp(\(\d*\))?|transaction_timestamp\(\)|statement_timestamp\(\)|clock_timestamp\(\))(::(timestamptz|timestamp with(out)? time zone|timestamp))?$/
 const UUID_DEFAULT = /^(public\.)?(gen_random_uuid|uuid_generate_v4)\(\)$/
 const SEQUENCE_DEFAULT = /^nextval\(/
 
 interface BuiltTable {
   id: string
   raw: RawTable
+  table: Table
   columnIds: Map<string, string>
+  columns: Map<string, Column>
 }
 
 interface ForeignKey {
@@ -49,7 +48,16 @@ export function buildSchema(
   newId: () => string,
   warn: BuildWarn
 ): Schema {
-  let schema = createSchema()
+  // The schema is assembled in place. The model's operations copy every table
+  // on each call, which is quadratic for a script with thousands of tables.
+  const tableList: Table[] = []
+  const relationshipList: Relationship[] = []
+  const typeList: UserType[] = []
+  const schema: Schema = {
+    version: 1,
+    tables: tableList,
+    relationships: relationshipList,
+  }
 
   // ---- types: assigned first, so a column can use a type defined anywhere
   const typeIds = new Map<string, string>()
@@ -81,8 +89,7 @@ export function buildSchema(
     if (addedTypes.has(type.name)) continue
     addedTypes.add(type.name)
     const id = typeIds.get(type.name) as string
-    schema = addType(
-      schema,
+    typeList.push(
       type.kind === 'enum'
         ? { kind: 'enum', id, name: type.name, values: type.values }
         : {
@@ -151,6 +158,12 @@ export function buildSchema(
   }
 
   // ---- tables and columns
+  const alteredKeys = new Map<string, string[]>()
+  for (const alter of raw.alters) {
+    if ('primaryKey' in alter && !alteredKeys.has(alter.table)) {
+      alteredKeys.set(alter.table, alter.primaryKey)
+    }
+  }
   const tables = new Map<string, BuiltTable>()
   for (const rawTable of raw.tables) {
     if (tables.has(rawTable.name)) {
@@ -161,18 +174,23 @@ export function buildSchema(
       continue
     }
     const tableId = newId()
-    schema = addTable(schema, { id: tableId, name: rawTable.name })
-    const alteredKey = raw.alters.find(
-      (alter) => alter.table === rawTable.name && 'primaryKey' in alter
-    )
+    const table: Table = {
+      id: tableId,
+      name: rawTable.name,
+      columns: [],
+      primaryKey: [],
+    }
+    tableList.push(table)
+    const alteredKey = alteredKeys.get(rawTable.name)
     const keyNames =
-      alteredKey && 'primaryKey' in alteredKey
-        ? alteredKey.primaryKey
+      alteredKey !== undefined
+        ? alteredKey
         : rawTable.primaryKey.length > 0
           ? rawTable.primaryKey
           : rawTable.columns.filter((c) => c.primaryKey).map((c) => c.name)
 
     const columnIds = new Map<string, string>()
+    const columnMap = new Map<string, Column>()
     for (const column of rawTable.columns) {
       if (columnIds.has(column.name)) {
         warn(
@@ -192,7 +210,7 @@ export function buildSchema(
         generated && (type.kind === 'integer' || type.kind === 'bigint')
       const id = newId()
       columnIds.set(column.name, id)
-      schema = addColumn(schema, tableId, {
+      const added: Column = {
         id,
         name: column.name,
         type,
@@ -203,7 +221,9 @@ export function buildSchema(
         ),
         ...(generated ? { generated: true } : {}),
         ...(fallback === undefined ? {} : { default: fallback }),
-      })
+      }
+      table.columns.push(added)
+      columnMap.set(column.name, added)
     }
     const keyIds: string[] = []
     for (const name of keyNames) {
@@ -217,8 +237,14 @@ export function buildSchema(
         keyIds.push(id)
       }
     }
-    schema = setPrimaryKey(schema, tableId, keyIds)
-    tables.set(rawTable.name, { id: tableId, raw: rawTable, columnIds })
+    table.primaryKey = keyIds
+    tables.set(rawTable.name, {
+      id: tableId,
+      raw: rawTable,
+      table,
+      columnIds,
+      columns: columnMap,
+    })
   }
 
   // ---- indexes
@@ -265,8 +291,7 @@ export function buildSchema(
       }
       columns.push(id)
     }
-    const present =
-      schema.tables.find((table) => table.id === built.id)?.indexes ?? []
+    const present = built.table.indexes ?? []
     if (
       unique &&
       present.some((index) => index.unique && sameIds(index.columns, columns))
@@ -275,13 +300,15 @@ export function buildSchema(
     const base =
       writtenName ??
       `${unique ? 'uq' : 'idx'}_${tableName}_${columnNames.join('_')}`
-    schema = addIndex(schema, built.id, {
+    const created: Index = {
       id: newId(),
       name: freeIndexName(base, origin, writtenName !== undefined),
       columns,
       unique,
-      method: method as 'btree' | 'hash' | 'gin' | 'gist',
-    })
+      method: method as Index['method'],
+    }
+    if (built.table.indexes) built.table.indexes.push(created)
+    else built.table.indexes = [created]
   }
   for (const { raw: rawTable } of tables.values()) {
     for (const column of rawTable.columns) {
@@ -381,10 +408,10 @@ export function buildSchema(
       )
       continue
     }
-    const target = schema.tables.find((table) => table.id === to.id)
+    const target = to.table
     const toColumn =
       key.reference.columns.length === 0
-        ? target?.primaryKey.length === 1
+        ? target.primaryKey.length === 1
           ? target.primaryKey[0]
           : undefined
         : to.columnIds.get(key.reference.columns[0] as string)
@@ -404,7 +431,7 @@ export function buildSchema(
       warn(key.origin, `The foreign key ${label} was ignored: ${issue.message}`)
       continue
     }
-    schema = addRelationship(schema, { id: newId(), from: from_, to: to_ })
+    relationshipList.push({ id: newId(), from: from_, to: to_ })
     if (key.reference.actions) {
       warn(
         key.origin,
@@ -425,19 +452,20 @@ export function buildSchema(
     }
     if (comment.text.trim() === '') continue
     if (comment.column === undefined) {
-      schema = setTableComment(schema, built.id, comment.text)
+      built.table.comment = comment.text
       continue
     }
-    const columnId = built.columnIds.get(comment.column)
-    if (columnId === undefined) {
+    const target = built.columns.get(comment.column)
+    if (target === undefined) {
       warn(
         comment.origin,
         `A comment on the unknown column "${comment.table}.${comment.column}" was ignored.`
       )
       continue
     }
-    schema = updateColumn(schema, built.id, columnId, { comment: comment.text })
+    target.comment = comment.text
   }
 
+  if (typeList.length > 0) schema.types = typeList
   return schema
 }

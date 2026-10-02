@@ -32,8 +32,8 @@ export function skipElement(cursor: Cursor): void {
   while (!cursor.done) {
     const token = cursor.peek() as Token
     if (token.kind === 'symbol') {
-      if (token.value === '(') depth++
-      else if (token.value === ')') {
+      if (token.value === '(' || token.value === '[') depth++
+      else if (token.value === ')' || token.value === ']') {
         if (depth === 0) return
         depth--
       } else if (token.value === ',' && depth === 0) return
@@ -49,8 +49,8 @@ export function parseExpression(cursor: Cursor, what: string): string {
   while (!cursor.done) {
     const token = cursor.peek() as Token
     if (token.kind === 'symbol') {
-      if (token.value === '(') depth++
-      else if (token.value === ')') {
+      if (token.value === '(' || token.value === '[') depth++
+      else if (token.value === ')' || token.value === ']') {
         if (depth === 0) break
         depth--
       } else if (token.value === ',' && depth === 0) break
