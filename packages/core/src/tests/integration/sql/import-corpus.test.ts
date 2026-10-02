@@ -203,5 +203,8 @@ describe('importSql: a pg_dump script', () => {
 
   it('imports every statement even when the data block holds semicolons and quotes', () => {
     assert.equal(table('order_items')?.columns.length, 3)
+    // These come after the data block: they are lost if the block swallowed them.
+    assert.equal(table('orders')?.primaryKey.length, 1)
+    assert.equal(result.schema.relationships.length, 2)
   })
 })

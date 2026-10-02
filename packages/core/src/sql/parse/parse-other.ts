@@ -1,3 +1,4 @@
+import { INDEX_METHODS } from '../../schema/types.ts'
 import type { Cursor } from './cursor.ts'
 import {
   parseColumnList,
@@ -15,8 +16,6 @@ import type {
   RawScript,
 } from './raw.ts'
 import type { Token } from './tokenize.ts'
-
-const INDEX_METHODS = ['btree', 'hash', 'gin', 'gist']
 
 /** Moves to the `,` that separates ALTER TABLE actions (depth 0), or the end. */
 function skipAction(cursor: Cursor): void {
@@ -151,7 +150,8 @@ export function parseCreateIndex(
   if (cursor.isWord('include')) reason = 'INCLUDE'
   else if (cursor.isWord('where')) reason = 'a WHERE clause'
   else if (!plain) reason = 'an expression, an ordering or an operator class'
-  else if (!INDEX_METHODS.includes(method)) reason = `the "${method}" method`
+  else if (!(INDEX_METHODS as readonly string[]).includes(method))
+    reason = `the "${method}" method`
 
   if (reason !== null) {
     cursor.warn(

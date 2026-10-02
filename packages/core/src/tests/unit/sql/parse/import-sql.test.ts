@@ -115,7 +115,7 @@ describe('importSql: generated columns and defaults', () => {
     assert.equal(column(sql, 'a').nullable, false)
     assert.equal(column(sql, 'b').nullable, false)
     assert.equal(column(sql, 'e').nullable, true)
-    assert.equal(run(sql).warnings.length, 1)
+    assert.equal(run(sql).warnings.length, 0)
   })
 
   it('keeps any other default raw, and a now() default on a timestamp without time zone', () => {
@@ -357,6 +357,81 @@ describe('importSql: comments and sequences', () => {
     assert.equal(id?.generated, true)
     assert.equal(n?.default, '5')
     assert.equal(c?.generated, true)
+  })
+})
+
+describe('importSql: a smallint identity', () => {
+  it('is imported as a plain smallint that is NOT NULL', () => {
+    const column = run(
+      'CREATE TABLE t (a smallint GENERATED ALWAYS AS IDENTITY)'
+    ).schema.tables[0]?.columns[0]
+    assert.equal(column?.nullable, false)
+    assert.equal(column?.generated, undefined)
+  })
+})
+
+describe('importSql: ALTER TABLE on what does not exist', () => {
+  it('warns about a primary key, a default and an identity on an unknown table or column', () => {
+    const cases: [string, string][] = [
+      ['ALTER TABLE ghost ADD PRIMARY KEY (id)', 'ghost'],
+      [
+        'CREATE TABLE t (a int); ALTER TABLE t ALTER COLUMN zz SET DEFAULT 1',
+        'zz',
+      ],
+      [
+        'CREATE TABLE t (a int); ALTER TABLE t ALTER COLUMN zz ADD GENERATED ALWAYS AS IDENTITY',
+        'zz',
+      ],
+      ['ALTER TABLE ghost ALTER COLUMN a SET DEFAULT 1', 'ghost'],
+    ]
+    for (const [sql, fragment] of cases) {
+      const result = run(sql)
+      assert.ok(
+        messages(result.warnings).some((m) => m.includes(fragment)),
+        `${sql} → ${JSON.stringify(messages(result.warnings))}`
+      )
+      assert.deepEqual(result.errors, [], sql)
+    }
+  })
+})
+
+describe('importSql: an index that repeats a column', () => {
+  it('keeps the column once and warns, instead of failing the whole import', () => {
+    const result = run(
+      'CREATE TABLE t (a int, b int); CREATE INDEX i ON t (a, b, a);'
+    )
+    assert.deepEqual(result.errors, [])
+    assert.equal(result.schema.tables[0]?.indexes?.[0]?.columns.length, 2)
+    assert.equal(result.warnings.length, 1)
+  })
+})
+
+describe('importSql: a script that is cut short', () => {
+  it('keeps a last statement that is complete, and says only that the script is cut', () => {
+    const result = run('CREATE TABLE a (x int)\n/* oops')
+    assert.deepEqual(
+      result.schema.tables.map((t) => t.name),
+      ['a']
+    )
+    assert.equal(result.errors.length, 1)
+    assert.deepEqual(result.warnings, [])
+  })
+
+  it('does not report a stump as an ignored statement', () => {
+    const result = run("CREATE TABLE a (x int);\nSELECT ';' 'oops")
+    assert.equal(result.errors.length, 1)
+    assert.deepEqual(result.warnings, [])
+  })
+
+  it('drops a last statement that is cut in the middle', () => {
+    const result = run(
+      "CREATE TABLE a (x int);\nCREATE TABLE b (y text DEFAULT 'oops"
+    )
+    assert.deepEqual(
+      result.schema.tables.map((t) => t.name),
+      ['a']
+    )
+    assert.equal(result.errors.length, 1)
   })
 })
 

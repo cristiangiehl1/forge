@@ -43,18 +43,29 @@ export function importSql(sql: string, newId: () => string): ImportResult {
 
   const raw = emptyScript()
   const statements = splitStatements(sql, tokens)
-  // Tokenizing stopped at a lexical error, so the last statement is cut short:
-  // the lexical error already says so, and parsing the stump would repeat it.
-  if (lexical.length > 0 && tokens[tokens.length - 1]?.value !== ';') {
-    statements.pop()
-  }
+  // Tokenizing stopped at a lexical error, so the last statement may be cut
+  // short. The lexical error already says so: the stump is read only to keep it
+  // if it happens to be complete, and says nothing of its own.
+  const last = tokens[tokens.length - 1]
+  const stump =
+    lexical.length > 0 && !(last?.kind === 'symbol' && last.value === ';')
+      ? statements[statements.length - 1]
+      : undefined
   for (const statement of statements) {
     const preview = previewOf(statement.text)
+    const isStump = statement === stump
     try {
-      parseStatement(statement, sql, raw, (line, message) => {
-        addWarning({ line, statement: preview, message })
-      })
+      parseStatement(
+        statement,
+        sql,
+        raw,
+        (line, message) => {
+          if (!isStump) addWarning({ line, statement: preview, message })
+        },
+        preview
+      )
     } catch (error) {
+      if (isStump && error instanceof ParseFailure) continue
       if (!(error instanceof ParseFailure)) throw error
       errors.push({
         line: error.line,

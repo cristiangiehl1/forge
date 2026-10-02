@@ -1,3 +1,7 @@
+import {
+  MAX_NUMERIC_PRECISION,
+  MAX_VARCHAR_LENGTH,
+} from '../../schema/types.ts'
 import type { Cursor } from './cursor.ts'
 import type { RawType } from './raw.ts'
 
@@ -38,11 +42,44 @@ function readNumbers(cursor: Cursor): number[] {
   const numbers: number[] = []
   do {
     const token = cursor.next()
-    if (token.kind !== 'number') cursor.fail('Expected a number in the type.')
+    if (token.kind !== 'number' || !/^\d+$/.test(token.value)) {
+      cursor.fail('Expected a whole number in the type.')
+    }
     numbers.push(Number(token.value))
   } while (cursor.acceptSymbol(','))
   cursor.expectSymbol(')')
   return numbers
+}
+
+/** A length of at least 1, and at most what PostgreSQL allows. */
+function checkLength(cursor: Cursor, length: number): number {
+  if (length < 1) cursor.fail('A length must be at least 1.')
+  if (length > MAX_VARCHAR_LENGTH) {
+    cursor.warn(`A length of ${length} is lowered to ${MAX_VARCHAR_LENGTH}.`)
+    return MAX_VARCHAR_LENGTH
+  }
+  return length
+}
+
+function checkPrecision(cursor: Cursor, precision: number): number {
+  if (precision < 1) cursor.fail('A precision must be at least 1.')
+  if (precision > MAX_NUMERIC_PRECISION) {
+    cursor.warn(
+      `A precision of ${precision} is lowered to ${MAX_NUMERIC_PRECISION}.`
+    )
+    return MAX_NUMERIC_PRECISION
+  }
+  return precision
+}
+
+function checkScale(cursor: Cursor, scale: number, precision: number): number {
+  if (scale > precision) {
+    cursor.warn(
+      `A scale of ${scale} is lowered to the precision, ${precision}.`
+    )
+    return precision
+  }
+  return scale
 }
 
 /** `with time zone` / `without time zone`: whether the zone is kept. */
@@ -93,7 +130,9 @@ export function parseColumnType(cursor: Cursor): {
     const varying =
       word === 'varchar' ||
       (word === 'character' && cursor.acceptWord('varying') !== null)
-    const [length] = readNumbers(cursor)
+    const [written] = readNumbers(cursor)
+    const length =
+      written === undefined ? undefined : checkLength(cursor, written)
     if (varying) {
       base =
         length === undefined ? { kind: 'text' } : { kind: 'varchar', length }
@@ -102,7 +141,13 @@ export function parseColumnType(cursor: Cursor): {
     }
   } else if (word === 'numeric' || word === 'decimal') {
     cursor.next()
-    const [precision, scale] = readNumbers(cursor)
+    const [written, writtenScale] = readNumbers(cursor)
+    const precision =
+      written === undefined ? undefined : checkPrecision(cursor, written)
+    const scale =
+      precision === undefined || writtenScale === undefined
+        ? writtenScale
+        : checkScale(cursor, writtenScale, precision)
     if (precision === undefined) {
       cursor.warn('numeric without a precision is imported as numeric(38,10).')
       base = { kind: 'numeric', precision: 38, scale: 10 }

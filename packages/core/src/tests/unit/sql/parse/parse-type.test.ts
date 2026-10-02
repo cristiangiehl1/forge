@@ -111,6 +111,31 @@ describe('parseColumnType: sized types', () => {
   })
 })
 
+describe('parseColumnType: sizes that make no sense', () => {
+  it('fails for a size that is not a whole number or is below 1', () => {
+    for (const sql of [
+      'varchar(1.5)',
+      'char(0)',
+      'numeric(0)',
+      'varchar(-3)',
+    ]) {
+      assert.throws(() => typeOf(sql), ParseFailure, sql)
+    }
+  })
+
+  it('clamps a length or precision over the limit and a scale over the precision, with a warning', () => {
+    const long = typeOf('varchar(99999999999)')
+    assert.deepEqual(long.type, { kind: 'varchar', length: 10_485_760 })
+    assert.equal(long.warnings.length, 1)
+    const wide = typeOf('numeric(5000)')
+    assert.deepEqual(wide.type, { kind: 'numeric', precision: 1000, scale: 0 })
+    assert.equal(wide.warnings.length, 1)
+    const scale = typeOf('numeric(10, 20)')
+    assert.deepEqual(scale.type, { kind: 'numeric', precision: 10, scale: 10 })
+    assert.equal(scale.warnings.length, 1)
+  })
+})
+
 describe('parseColumnType: serial', () => {
   it('reads serial types as integers marked serial', () => {
     assert.deepEqual(typeOf('serial'), {

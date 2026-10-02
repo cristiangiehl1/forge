@@ -18,15 +18,30 @@ export function previewOf(text: string): string {
   return flat.length > 80 ? `${flat.slice(0, 77)}...` : flat
 }
 
+/** Words that say how a statement is made, not what it is. */
+const MODIFIERS = new Set([
+  'or',
+  'replace',
+  'temp',
+  'temporary',
+  'unlogged',
+  'global',
+  'local',
+  'unique',
+  'recursive',
+])
+
 function ignored(statement: Statement, warn: Warn): void {
   const words = statement.tokens
-    .filter((token) => token.kind === 'word')
+    .filter((token) => token.kind === 'word' && !MODIFIERS.has(token.value))
     .slice(0, 2)
     .map((token) => token.text.toUpperCase())
     .join(' ')
   warn(
     statement.line,
-    `${words || 'This'} statements are not modelled and were ignored.`
+    words === ''
+      ? 'A statement that does not start with a keyword is not modelled and was ignored.'
+      : `${words} statements are not modelled and were ignored.`
   )
 }
 
@@ -34,13 +49,11 @@ export function parseStatement(
   statement: Statement,
   sql: string,
   raw: RawScript,
-  warn: Warn
+  warn: Warn,
+  preview: string = previewOf(statement.text)
 ): void {
   const cursor = new Cursor(statement.tokens, sql, warn)
-  const origin: Origin = {
-    line: statement.line,
-    text: previewOf(statement.text),
-  }
+  const origin: Origin = { line: statement.line, text: preview }
 
   if (cursor.acceptWord('create')) {
     cursor.acceptWords('or', 'replace')

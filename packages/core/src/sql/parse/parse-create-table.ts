@@ -110,10 +110,11 @@ function parseGenerated(cursor: Cursor, column: RawColumn): void {
   cursor.expectWord('as')
   if (cursor.acceptWord('identity')) {
     column.generated = true
+    column.notNull = true
     if (cursor.isSymbol('(')) cursor.skipBalanced()
   } else {
     cursor.skipBalanced()
-    cursor.acceptWord('stored')
+    cursor.acceptWord('stored', 'virtual')
     cursor.warn(
       `The generated expression of column "${column.name}" is not modelled; it is imported as a plain column.`
     )
@@ -208,6 +209,12 @@ export function parseCreateTable(
   }
   if (cursor.isWord('partition')) {
     cursor.warn(`Partition "${name}" is not modelled and was ignored.`)
+    return null
+  }
+  if (cursor.isWord('of')) {
+    cursor.warn(
+      `Typed table "${name}" (OF type) is not modelled and was ignored.`
+    )
     return null
   }
   cursor.expectSymbol('(')

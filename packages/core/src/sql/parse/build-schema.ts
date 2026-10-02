@@ -140,14 +140,12 @@ export function buildSchema(
     const text = (defaultOverrides.get(key) ?? column.default)?.trim()
     if (text === undefined || text === '') return { generated: false }
     const lower = text.toLowerCase()
+    // pg_dump writes a serial as an integer with a sequence default: that is an
+    // identity column here, the same thing a serial type is read as.
     if (
       (type.kind === 'integer' || type.kind === 'bigint') &&
       SEQUENCE_DEFAULT.test(lower)
     ) {
-      warn(
-        origin,
-        `The sequence default of "${table}.${column.name}" is imported as an identity column.`
-      )
       return { generated: true }
     }
     if (type.kind === 'timestamp' && NOW_DEFAULT.test(lower))
@@ -247,6 +245,35 @@ export function buildSchema(
     })
   }
 
+  // ---- ALTER TABLE actions whose table or column does not exist
+  for (const alter of raw.alters) {
+    if (
+      !('primaryKey' in alter || 'setDefault' in alter || 'identity' in alter)
+    ) {
+      continue
+    }
+    const built = tables.get(alter.table)
+    if (!built) {
+      warn(
+        alter.origin,
+        `ALTER TABLE on the unknown table "${alter.table}" was ignored.`
+      )
+      continue
+    }
+    const column =
+      'setDefault' in alter
+        ? alter.setDefault.column
+        : 'identity' in alter
+          ? alter.identity
+          : undefined
+    if (column !== undefined && !built.columnIds.has(column)) {
+      warn(
+        alter.origin,
+        `ALTER TABLE "${alter.table}" refers to the unknown column "${column}" and was ignored.`
+      )
+    }
+  }
+
   // ---- indexes
   const usedIndexNames = new Set<string>()
   const freeIndexName = (
@@ -278,6 +305,13 @@ export function buildSchema(
     if (!built) {
       warn(origin, `An index on the unknown table "${tableName}" was ignored.`)
       return
+    }
+    if (new Set(columnNames).size !== columnNames.length) {
+      warn(
+        origin,
+        `An index on "${tableName}" repeats a column; it is kept once.`
+      )
+      columnNames = [...new Set(columnNames)]
     }
     const columns: string[] = []
     for (const name of columnNames) {

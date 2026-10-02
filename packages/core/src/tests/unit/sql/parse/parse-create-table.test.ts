@@ -87,6 +87,21 @@ describe('CREATE TABLE: column constraints', () => {
     assert.equal(column(sql, 'd').generated, false)
   })
 
+  it('makes an identity column NOT NULL, as PostgreSQL does, whatever its type', () => {
+    const sql =
+      'CREATE TABLE t (a smallint GENERATED ALWAYS AS IDENTITY, b integer GENERATED ALWAYS AS IDENTITY)'
+    assert.equal(column(sql, 'a').notNull, true)
+    assert.equal(column(sql, 'b').notNull, true)
+  })
+
+  it('warns about a VIRTUAL generated expression too', () => {
+    const { table, warnings } = tableOf(
+      'CREATE TABLE t (a int, b int GENERATED ALWAYS AS (a * 2) VIRTUAL)'
+    )
+    assert.equal(table.columns[1]?.generated, false)
+    assert.equal(warnings.length, 1)
+  })
+
   it('warns about a generated expression and keeps a plain column', () => {
     const { table, warnings } = tableOf(
       'CREATE TABLE t (a int, b int GENERATED ALWAYS AS (a * 2) STORED)'
@@ -212,6 +227,18 @@ describe('CREATE TABLE: what is not a plain table, and what is wrong', () => {
   it('fails when the parenthesis is never closed', () => {
     const result = parseScript('CREATE TABLE a (x int')
     assert.equal(result.failures.length, 1)
+  })
+
+  it('labels an ignored statement by its kind, not by its modifiers', () => {
+    const result = parseScript(`
+      CREATE OR REPLACE FUNCTION f() RETURNS int AS $$ select 1 $$ LANGUAGE sql;
+      CREATE TEMP VIEW v AS SELECT 1;
+      1;`)
+    assert.deepEqual(result.warnings, [
+      '2: CREATE FUNCTION statements are not modelled and were ignored.',
+      '3: CREATE VIEW statements are not modelled and were ignored.',
+      '4: A statement that does not start with a keyword is not modelled and was ignored.',
+    ])
   })
 
   it('warns that other statements are not modelled', () => {
