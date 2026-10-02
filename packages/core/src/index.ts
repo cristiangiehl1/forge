@@ -4,17 +4,26 @@ export type { ParseError, ParseResult } from './project/parse-project.ts'
 export { parseProject } from './project/parse-project.ts'
 export type { Project } from './project/project.ts'
 export { CURRENT_FORMAT_VERSION, createProject } from './project/project.ts'
+export type { TypeUsage } from './schema/operations.ts'
 export {
   addColumn,
+  addIndex,
   addRelationship,
   addTable,
+  addType,
   createSchema,
   removeColumn,
+  removeIndex,
   removeRelationship,
   removeTable,
+  removeType,
   renameTable,
   setPrimaryKey,
+  setTableComment,
+  typeUsages,
   updateColumn,
+  updateIndex,
+  updateType,
 } from './schema/operations.ts'
 export { sameTypeShape, userTypeIdsOf } from './schema/type-shape.ts'
 export type {
