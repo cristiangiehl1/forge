@@ -1,29 +1,23 @@
 import type { EdgeProps } from '@xyflow/react'
-import { BaseEdge, EdgeLabelRenderer, getBezierPath } from '@xyflow/react'
+import { BaseEdge, EdgeLabelRenderer } from '@xyflow/react'
 
 import { forgeStore } from '../../hooks/use-forge-store.ts'
+import type { RelationshipFlowEdge } from '../../lib/canvas/to-flow.ts'
+import { pathFromPoints, pointAlong } from '../../lib/routing/path.ts'
 
 /** A relationship line. Once selected, it shows a button to remove it. */
 export function RelationshipEdge({
   id,
-  sourceX,
-  sourceY,
-  targetX,
-  targetY,
-  sourcePosition,
-  targetPosition,
+  data,
   selected,
   markerEnd,
   style,
-}: EdgeProps) {
-  const [path, labelX, labelY] = getBezierPath({
-    sourceX,
-    sourceY,
-    sourcePosition,
-    targetX,
-    targetY,
-    targetPosition,
-  })
+}: EdgeProps<RelationshipFlowEdge>) {
+  // The route was worked out round the tables (lib/routing); React Flow's own
+  // endpoints are ignored so the line never cuts across a table.
+  const points = data?.points ?? []
+  const path = pathFromPoints(points)
+  const { x: labelX, y: labelY } = pointAlong(points, 0.5)
 
   return (
     <>

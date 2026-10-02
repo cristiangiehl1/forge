@@ -168,7 +168,12 @@ export class Editor {
     return this.page.locator('.react-flow__edge')
   }
 
-  private handle(ref: ColumnRef, kind: 'source' | 'target'): Locator {
+  /** A column's connection point on one side of its table (l or r). */
+  private handle(
+    ref: ColumnRef,
+    kind: 'source' | 'target',
+    side: 'l' | 'r'
+  ): Locator {
     return this.node(ref.table)
       .locator('.table-node__column')
       .filter({
@@ -176,13 +181,17 @@ export class Editor {
           hasText: exact(ref.column),
         }),
       })
-      .locator(`.react-flow__handle.${kind}`)
+      .locator(`.react-flow__handle.${kind}[data-handleid$=':${side}']`)
   }
 
   /** Drags from `from` to `to` once, without checking the outcome. */
-  async drag(from: ColumnRef, to: ColumnRef) {
-    const source = this.handle(from, 'source')
-    const target = this.handle(to, 'target')
+  async drag(
+    from: ColumnRef,
+    to: ColumnRef,
+    sides: { from: 'l' | 'r'; to: 'l' | 'r' } = { from: 'r', to: 'l' }
+  ) {
+    const source = this.handle(from, 'source', sides.from)
+    const target = this.handle(to, 'target', sides.to)
     await expect(source).toBeAttached()
     await expect(target).toBeAttached()
     const a = await source.boundingBox()

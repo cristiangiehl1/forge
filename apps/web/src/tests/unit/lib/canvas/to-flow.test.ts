@@ -4,11 +4,15 @@ import { describe, it } from 'node:test'
 import type { Schema } from '@forge/core'
 
 import {
+  columnOfHandle,
   connectionToRefs,
+  handleId,
+  resolvePositions,
   toFlowEdges,
   toFlowNodes,
 } from '../../../../lib/canvas/to-flow.ts'
 import { createView, nextNodePosition } from '../../../../lib/project-view.ts'
+import { routeRelationships } from '../../../../lib/routing/route-relationships.ts'
 
 const schema: Schema = {
   version: 1,
@@ -64,19 +68,49 @@ describe('toFlowNodes', () => {
   })
 })
 
+describe('handle ids', () => {
+  it('name the column and the side of the table', () => {
+    assert.equal(handleId('c1', 'l'), 'c1:l')
+    assert.equal(handleId('c1', 'r'), 'c1:r')
+  })
+
+  it('give the column back, whichever side', () => {
+    assert.equal(columnOfHandle('c1:l'), 'c1')
+    assert.equal(columnOfHandle('c1:r'), 'c1')
+    assert.equal(columnOfHandle('some-uuid-1234:r'), 'some-uuid-1234')
+  })
+
+  it('leave an id without a side as it is', () => {
+    assert.equal(columnOfHandle('c1'), 'c1')
+  })
+})
+
+describe('resolvePositions', () => {
+  it('uses the saved position and falls back to the grid', () => {
+    const view = { ...createView(), nodes: { a: { x: 7, y: 8 } } }
+    assert.deepEqual(resolvePositions(schema, view), {
+      a: { x: 7, y: 8 },
+      b: nextNodePosition(1),
+    })
+  })
+})
+
 describe('toFlowEdges', () => {
-  it('creates one edge per relationship from column handle to column handle', () => {
-    assert.deepEqual(toFlowEdges(schema, null), [
-      {
-        id: 'r',
-        type: 'relationship',
-        source: 'b',
-        sourceHandle: 'b1',
-        target: 'a',
-        targetHandle: 'a1',
-        selected: false,
-      },
-    ])
+  const routes = routeRelationships(
+    schema,
+    resolvePositions(schema, createView())
+  )
+
+  it('creates one relationship edge per relationship, joining the sides its route chose', () => {
+    const [edge] = toFlowEdges(schema, routes, null, null)
+    const route = routes.get('r')
+    assert.equal(edge?.id, 'r')
+    assert.equal(edge?.type, 'relationship')
+    assert.equal(edge?.source, 'b')
+    assert.equal(edge?.target, 'a')
+    assert.equal(edge?.sourceHandle, `b1:${route?.sourceSide}`)
+    assert.equal(edge?.targetHandle, `a1:${route?.targetSide}`)
+    assert.deepEqual(edge?.data?.points, route?.points)
   })
 
   it('marks only the selected relationship as selected', () => {
@@ -91,25 +125,59 @@ describe('toFlowEdges', () => {
         },
       ],
     }
+    const both = routeRelationships(two, resolvePositions(two, createView()))
     assert.deepEqual(
-      toFlowEdges(two, 's').map((edge) => edge.selected),
+      toFlowEdges(two, both, 's', null).map((edge) => edge.selected),
       [false, true]
     )
   })
 
-  it('returns no edges for a schema without relationships', () => {
-    assert.deepEqual(toFlowEdges({ ...schema, relationships: [] }, null), [])
+  it('marks the relationships of the hovered table as related, and no others', () => {
+    const two: Schema = {
+      ...schema,
+      tables: [
+        ...schema.tables,
+        {
+          id: 'c',
+          name: 'c',
+          columns: [
+            { id: 'c1', name: 'c1', type: { kind: 'uuid' }, nullable: false },
+          ],
+          primaryKey: [],
+        },
+      ],
+      relationships: [
+        ...schema.relationships,
+        {
+          id: 's',
+          from: { tableId: 'c', columnId: 'c1' },
+          to: { tableId: 'a', columnId: 'a1' },
+        },
+      ],
+    }
+    const all = routeRelationships(two, resolvePositions(two, createView()))
+    const classes = (hovered: string | null) =>
+      toFlowEdges(two, all, null, hovered).map((edge) => edge.className ?? '')
+    assert.deepEqual(classes('b'), ['related', ''])
+    assert.deepEqual(classes('a'), ['related', 'related'])
+    assert.deepEqual(classes(null), ['', ''])
+  })
+
+  it('has no edges for a schema without relationships, and skips one without a route', () => {
+    const none = { ...schema, relationships: [] }
+    assert.deepEqual(toFlowEdges(none, new Map(), null, null), [])
+    assert.deepEqual(toFlowEdges(schema, new Map(), null, null), [])
   })
 })
 
 describe('connectionToRefs', () => {
-  it('turns a connection into from and to column references', () => {
+  it('turns a connection into from and to column references, whichever side the handles are on', () => {
     assert.deepEqual(
       connectionToRefs({
         source: 'b',
-        sourceHandle: 'b1',
+        sourceHandle: 'b1:l',
         target: 'a',
-        targetHandle: 'a1',
+        targetHandle: 'a1:r',
       }),
       {
         from: { tableId: 'b', columnId: 'b1' },
@@ -124,7 +192,7 @@ describe('connectionToRefs', () => {
         source: 'b',
         sourceHandle: null,
         target: 'a',
-        targetHandle: 'a1',
+        targetHandle: 'a1:l',
       }),
       null
     )

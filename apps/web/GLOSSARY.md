@@ -12,7 +12,7 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 
 **Inspector**: the side panel that edits the selected Table: its name and its columns. The table node itself is read-only.
 
-**Toolbar**: the strip with the project-level actions: new table, the "New tables start with" preference, show or hide the DDL.
+**Toolbar**: the strip with the project-level actions: new table, the "New tables start with" preference, load example, auto-arrange, show or hide the DDL.
 
 **DDL panel**: the panel that shows the PostgreSQL DDL generated from the Schema, or the list of Issues that prevent it.
 
@@ -23,3 +23,11 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 **Persistence mode**: `ready` (changes are autosaved) or `blocked` (the stored project could not be read, so nothing is saved until the user starts a new project).
 
 **New-table id preference**: the app setting "New tables start with": `integer` (a generated integer `id`, the default), `uuid` (a generated uuid `id`) or `none`. It only affects tables created afterwards, belongs to the app and not to a project, and is kept under its own storage key.
+
+**Node geometry**: the fixed size of a table node (220 px wide, a 31 px title, 26 px per column row, 1 px border), pinned in both `lib/geometry.ts` and the CSS. Layout and routing rely on it to know where every table and connection point is without measuring the page.
+
+**Layout**: `layoutTables` places tables in layers by their relationships: a table referenced by another sits to its left, siblings are ordered to keep lines short, and unrelated tables go to the side. The toolbar's "Auto-arrange" applies it; the example is laid out with it.
+
+**Route**: the orthogonal polyline of a Relationship, worked out by `routeRelationships` so it goes round every table. Each column row has a connection point on both sides of its table; the route picks the sides, and the edge draws exactly those points.
+
+**Hover**: the Table under the pointer, or whose statement in the DDL panel is under the pointer. It highlights the node, its Relationship lines and its statement (the rest of the script dims).

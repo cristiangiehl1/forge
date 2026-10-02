@@ -1,6 +1,5 @@
-import type { Edge } from '@xyflow/react'
-
-import type { TableFlowNode } from './to-flow.ts'
+import type { Point } from '../geometry.ts'
+import type { RelationshipFlowEdge, TableFlowNode } from './to-flow.ts'
 
 export const sameNode = (a: TableFlowNode, b: TableFlowNode): boolean =>
   a.id === b.id &&
@@ -10,14 +9,23 @@ export const sameNode = (a: TableFlowNode, b: TableFlowNode): boolean =>
   a.selected === b.selected &&
   a.data.tableId === b.data.tableId
 
-export const sameEdge = (a: Edge, b: Edge): boolean =>
+const samePoints = (a: Point[], b: Point[]): boolean =>
+  a.length === b.length &&
+  a.every((point, i) => point.x === b[i]?.x && point.y === b[i]?.y)
+
+export const sameEdge = (
+  a: RelationshipFlowEdge,
+  b: RelationshipFlowEdge
+): boolean =>
   a.id === b.id &&
   a.type === b.type &&
   a.source === b.source &&
   a.target === b.target &&
   a.sourceHandle === b.sourceHandle &&
   a.targetHandle === b.targetHandle &&
-  a.selected === b.selected
+  a.selected === b.selected &&
+  a.className === b.className &&
+  samePoints(a.data?.points ?? [], b.data?.points ?? [])
 
 /**
  * Rebuilding the nodes and edges on every change hands React Flow brand-new

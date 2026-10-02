@@ -1,7 +1,14 @@
 import { checkRelationship } from '@forge/core'
 import type { Connection, Edge, EdgeChange, NodeChange } from '@xyflow/react'
-import { Background, Controls, ReactFlow } from '@xyflow/react'
+import {
+  Background,
+  ConnectionMode,
+  Controls,
+  ReactFlow,
+  useReactFlow,
+} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
+import { useEffect } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 import { edgesOnly } from '../../lib/canvas/deletion-guard.ts'
@@ -18,9 +25,11 @@ import {
 import type { TableFlowNode } from '../../lib/canvas/to-flow.ts'
 import {
   connectionToRefs,
+  resolvePositions,
   toFlowEdges,
   toFlowNodes,
 } from '../../lib/canvas/to-flow.ts'
+import { routeRelationships } from '../../lib/routing/route-relationships.ts'
 import { RelationshipEdge } from './relationship-edge.tsx'
 import { TableNode } from './table-node.tsx'
 
@@ -45,6 +54,21 @@ const canvasActions: CanvasActions = {
     forgeStore.getState().relationshipSelection,
 }
 
+// Frames every table after an auto-arrange or a loaded example. It lives inside
+// <ReactFlow> to reach the instance, and waits a frame for the nodes to be measured.
+function FitOnRequest() {
+  const { fitView } = useReactFlow()
+  const fitRequest = useForgeStore((state) => state.fitRequest)
+  useEffect(() => {
+    if (fitRequest === 0) return
+    const frame = requestAnimationFrame(() =>
+      fitView({ padding: 0.15, duration: 0 })
+    )
+    return () => cancelAnimationFrame(frame)
+  }, [fitRequest, fitView])
+  return null
+}
+
 export function Canvas() {
   const schema = useForgeStore((state) => state.schema)
   const view = useForgeStore((state) => state.view)
@@ -53,10 +77,16 @@ export function Canvas() {
     (state) => state.relationshipSelection
   )
 
+  const hoveredTable = useForgeStore((state) => state.hoveredTable)
   const projectEpoch = useForgeStore((state) => state.projectEpoch)
 
   const nodes = stableNodes(toFlowNodes(schema, view, selection))
-  const edges = stableEdges(toFlowEdges(schema, relationshipSelection))
+  // Routing is the costly part and depends on the schema and the positions only;
+  // hover and selection just restyle the edges that come out of it.
+  const routes = routeRelationships(schema, resolvePositions(schema, view))
+  const edges = stableEdges(
+    toFlowEdges(schema, routes, relationshipSelection, hoveredTable)
+  )
 
   function isValidConnection(connection: Connection | Edge) {
     const refs = connectionToRefs(connection)
@@ -84,6 +114,7 @@ export function Canvas() {
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      connectionMode={ConnectionMode.Loose}
       onNodesChange={(changes: NodeChange<TableFlowNode>[]) =>
         forwardNodeChanges(changes, canvasActions)
       }
@@ -92,6 +123,8 @@ export function Canvas() {
       }
       onConnect={onConnect}
       isValidConnection={isValidConnection}
+      onNodeMouseEnter={(_, node) => forgeStore.getState().hoverTable(node.id)}
+      onNodeMouseLeave={() => forgeStore.getState().hoverTable(null)}
       onNodeClick={(_, node) => forgeStore.getState().select(node.id)}
       onPaneClick={() => forgeStore.getState().clearSelection()}
       onMoveEnd={(_, viewport) => forgeStore.getState().setViewport(viewport)}
@@ -99,6 +132,7 @@ export function Canvas() {
       deleteKeyCode={['Backspace', 'Delete']}
       onBeforeDelete={async (deletion) => edgesOnly(deletion)}
       colorMode='system'>
+      <FitOnRequest />
       <Background />
       <Controls showInteractive={false} />
     </ReactFlow>

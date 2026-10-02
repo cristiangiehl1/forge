@@ -66,18 +66,46 @@ describe('createStabilizer', () => {
 describe('sameEdge', () => {
   const edge = {
     id: 'r',
-    type: 'relationship',
+    type: 'relationship' as const,
     source: 'a',
     target: 'b',
-    sourceHandle: 'x',
-    targetHandle: 'y',
+    sourceHandle: 'x:r',
+    targetHandle: 'y:l',
     selected: false,
+    data: {
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+      ],
+    },
   }
 
   it('compares everything that is drawn', () => {
-    assert.equal(sameEdge(edge, { ...edge }), true)
+    assert.equal(
+      sameEdge(edge, { ...edge, data: { points: [...edge.data.points] } }),
+      true
+    )
     assert.equal(sameEdge(edge, { ...edge, selected: true }), false)
     assert.equal(sameEdge(edge, { ...edge, target: 'c' }), false)
-    assert.equal(sameEdge(edge, { ...edge, sourceHandle: 'z' }), false)
+    assert.equal(sameEdge(edge, { ...edge, sourceHandle: 'z:l' }), false)
+    assert.equal(sameEdge(edge, { ...edge, className: 'related' }), false)
+  })
+
+  it('notices a route that moved', () => {
+    const moved = {
+      ...edge,
+      data: {
+        points: [
+          { x: 0, y: 0 },
+          { x: 10, y: 5 },
+        ],
+      },
+    }
+    assert.equal(sameEdge(edge, moved), false)
+    const longer = {
+      ...edge,
+      data: { points: [...edge.data.points, { x: 10, y: 9 }] },
+    }
+    assert.equal(sameEdge(edge, longer), false)
   })
 })

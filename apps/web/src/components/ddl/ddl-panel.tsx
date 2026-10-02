@@ -1,14 +1,21 @@
 import { generateDdl, postgres } from '@forge/core'
-import { useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 
-import { useForgeStore } from '../../hooks/use-forge-store.ts'
+import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 
 type CopyState = 'idle' | 'copied' | 'failed'
 
 export function DdlPanel() {
   const schema = useForgeStore((state) => state.schema)
   const [copyState, setCopyState] = useState<CopyState>('idle')
+  const hoveredTable = useForgeStore((state) => state.hoveredTable)
+  const activeRef = useRef<HTMLSpanElement | null>(null)
   const result = generateDdl(schema, postgres)
+
+  // Bring the hovered table's statement into view; the panel scrolls, not the page.
+  useEffect(() => {
+    if (hoveredTable) activeRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [hoveredTable])
 
   async function copy(sql: string) {
     try {
@@ -49,8 +56,32 @@ export function DdlPanel() {
                 ? 'Copy failed'
                 : 'Copy'}
           </button>
-          <pre>
-            <code>{result.sql}</code>
+          <pre className={hoveredTable ? 'ddl--focus' : undefined}>
+            <code>
+              {result.statements.map((statement, index) => (
+                <Fragment key={statement.key}>
+                  {/* biome-ignore lint/a11y/noStaticElementInteractions: a pointer-only link between a statement and its table; nothing here is needed to use the app */}
+                  <span
+                    onMouseEnter={() =>
+                      forgeStore.getState().hoverTable(statement.tableId)
+                    }
+                    onMouseLeave={() => forgeStore.getState().hoverTable(null)}
+                    ref={
+                      statement.tableId === hoveredTable &&
+                      statement.kind === 'create'
+                        ? activeRef
+                        : null
+                    }
+                    data-table={statement.tableId}
+                    className={
+                      statement.tableId === hoveredTable ? 'ddl-active' : ''
+                    }>
+                    {statement.sql}
+                  </span>
+                  {index < result.statements.length - 1 ? '\n\n' : '\n'}
+                </Fragment>
+              ))}
+            </code>
           </pre>
         </>
       )}

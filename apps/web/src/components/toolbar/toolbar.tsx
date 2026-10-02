@@ -53,6 +53,12 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
           Load example
         </button>
       )}
+      <button
+        type='button'
+        disabled={!hasTables}
+        onClick={() => forgeStore.getState().autoLayout()}>
+        Auto-arrange
+      </button>
       <button type='button' aria-pressed={ddlOpen} onClick={onToggleDdl}>
         {ddlOpen ? 'Hide DDL' : 'Show DDL'}
       </button>
