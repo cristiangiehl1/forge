@@ -115,6 +115,32 @@ export async function buildShop(editor: Editor) {
   await buildShopForeignKeys(editor)
 }
 
+/**
+ * Foreign keys are declared inside the table that holds them, after the primary
+ * key. The shop's tables are created in dependency order already, so no ALTER
+ * TABLE is needed.
+ */
+function inlineForeignKeys(statement: string[]): string[] {
+  const name = /^CREATE TABLE "([^"]+)"/.exec(statement[0] ?? '')?.[1]
+  const constraints = SHOP_FOREIGN_KEYS.filter(
+    (foreignKey) => foreignKey.from.table === name
+  ).map(
+    ({ from, to }) =>
+      `  CONSTRAINT "fk_${from.table}_${from.column}" FOREIGN KEY ("${from.column}") REFERENCES "${to.table}" ("${to.column}")`
+  )
+  if (constraints.length === 0) return statement
+  const lines = [...statement.slice(1, -1), ...constraints].map((line) =>
+    line.replace(/,$/, '')
+  )
+  return [
+    statement[0] as string,
+    ...lines.map((line, index) =>
+      index < lines.length - 1 ? `${line},` : line
+    ),
+    ');',
+  ]
+}
+
 /** The DDL the shop must produce, statement by statement. */
 export const SHOP_DDL = [
   [
@@ -168,12 +194,8 @@ export const SHOP_DDL = [
     '  PRIMARY KEY ("id")',
     ');',
   ],
-  ...SHOP_FOREIGN_KEYS.map(({ from, to }) => [
-    `ALTER TABLE "${from.table}"`,
-    `  ADD CONSTRAINT "fk_${from.table}_${from.column}"`,
-    `  FOREIGN KEY ("${from.column}") REFERENCES "${to.table}" ("${to.column}");`,
-  ]),
 ]
+  .map(inlineForeignKeys)
   .map((statement) => statement.join('\n'))
   .join('\n\n')
   .concat('\n')

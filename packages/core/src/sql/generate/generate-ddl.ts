@@ -22,7 +22,43 @@ function requireColumn(table: Table, columnId: string): Column {
   return found
 }
 
-function createTable(table: Table, dialect: Dialect): string {
+interface ForeignKey {
+  name: string
+  /** `FOREIGN KEY (...) REFERENCES ...`, without a constraint name. */
+  clause: string
+  fromTable: string
+}
+
+/** Names a relationship's constraint and writes its `FOREIGN KEY` clause. */
+function foreignKeyOf(
+  schema: Schema,
+  relationship: Relationship,
+  dialect: Dialect,
+  usedNames: Set<string>
+): ForeignKey {
+  const quote = (name: string) => dialect.quoteIdentifier(name)
+  const fromTable = requireTable(schema, relationship.from.tableId)
+  const fromColumn = requireColumn(fromTable, relationship.from.columnId)
+  const toTable = requireTable(schema, relationship.to.tableId)
+  const toColumn = requireColumn(toTable, relationship.to.columnId)
+  return {
+    name: uniqueName(
+      `fk_${fromTable.name}_${fromColumn.name}`,
+      usedNames,
+      dialect.maxIdentifierBytes
+    ),
+    clause: `FOREIGN KEY (${quote(fromColumn.name)}) REFERENCES ${quote(toTable.name)} (${quote(toColumn.name)})`,
+    fromTable: fromTable.name,
+  }
+}
+
+function createTable(
+  schema: Schema,
+  table: Table,
+  inline: Relationship[],
+  dialect: Dialect,
+  usedNames: Set<string>
+): string {
   const quote = (name: string) => dialect.quoteIdentifier(name)
   const lines = table.columns.map((column) => {
     // The script must say what the database will do: an identity column is
@@ -43,6 +79,10 @@ function createTable(table: Table, dialect: Dialect): string {
     )
     lines.push(`  PRIMARY KEY (${names.join(', ')})`)
   }
+  for (const relationship of inline) {
+    const foreignKey = foreignKeyOf(schema, relationship, dialect, usedNames)
+    lines.push(`  CONSTRAINT ${quote(foreignKey.name)} ${foreignKey.clause}`)
+  }
   if (lines.length === 0) return `CREATE TABLE ${quote(table.name)} ();`
   return `CREATE TABLE ${quote(table.name)} (\n${lines.join(',\n')}\n);`
 }
@@ -54,29 +94,73 @@ function addForeignKey(
   usedNames: Set<string>
 ): string {
   const quote = (name: string) => dialect.quoteIdentifier(name)
-  const fromTable = requireTable(schema, relationship.from.tableId)
-  const fromColumn = requireColumn(fromTable, relationship.from.columnId)
-  const toTable = requireTable(schema, relationship.to.tableId)
-  const toColumn = requireColumn(toTable, relationship.to.columnId)
-  const name = uniqueName(
-    `fk_${fromTable.name}_${fromColumn.name}`,
-    usedNames,
-    dialect.maxIdentifierBytes
-  )
+  const foreignKey = foreignKeyOf(schema, relationship, dialect, usedNames)
   return [
-    `ALTER TABLE ${quote(fromTable.name)}`,
-    `  ADD CONSTRAINT ${quote(name)}`,
-    `  FOREIGN KEY (${quote(fromColumn.name)}) REFERENCES ${quote(toTable.name)} (${quote(toColumn.name)});`,
+    `ALTER TABLE ${quote(foreignKey.fromTable)}`,
+    `  ADD CONSTRAINT ${quote(foreignKey.name)}`,
+    `  ${foreignKey.clause};`,
   ].join('\n')
+}
+
+interface PlannedTable {
+  table: Table
+  /** The relationships declared inside this table's CREATE TABLE. */
+  inline: Relationship[]
+}
+
+/**
+ * A foreign key can only point at a table that already exists, so a table is
+ * created right after the tables it references; otherwise the schema order is
+ * kept. A reference to a table that is still being placed (a cycle) cannot be
+ * declared inside the table: only that relationship is deferred to an
+ * ALTER TABLE after every table exists. A table that references itself is fine.
+ */
+function planTables(schema: Schema): {
+  planned: PlannedTable[]
+  deferred: Relationship[]
+} {
+  const state = new Map<string, 'visiting' | 'done'>()
+  const planned: PlannedTable[] = []
+  const deferred: Relationship[] = []
+
+  const visit = (table: Table) => {
+    state.set(table.id, 'visiting')
+    const inline: Relationship[] = []
+    for (const relationship of schema.relationships) {
+      if (relationship.from.tableId !== table.id) continue
+      const targetId = relationship.to.tableId
+      if (targetId === table.id) {
+        inline.push(relationship)
+        continue
+      }
+      const status = state.get(targetId)
+      if (status === 'visiting') {
+        deferred.push(relationship)
+        continue
+      }
+      if (status === undefined) visit(requireTable(schema, targetId))
+      inline.push(relationship)
+    }
+    state.set(table.id, 'done')
+    planned.push({ table, inline })
+  }
+
+  for (const table of schema.tables) {
+    if (!state.has(table.id)) visit(table)
+  }
+  return { planned, deferred }
 }
 
 export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
   const issues = validate(schema)
   if (issues.length > 0) return { ok: false, issues }
 
-  const statements = schema.tables.map((table) => createTable(table, dialect))
+  const { planned, deferred } = planTables(schema)
   const usedNames = new Set<string>()
-  for (const relationship of schema.relationships) {
+  const statements = planned.map(({ table, inline }) =>
+    createTable(schema, table, inline, dialect, usedNames)
+  )
+  for (const relationship of deferred) {
     statements.push(addForeignKey(schema, relationship, dialect, usedNames))
   }
 

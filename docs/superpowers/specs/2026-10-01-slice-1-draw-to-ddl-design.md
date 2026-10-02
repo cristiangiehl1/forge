@@ -65,8 +65,8 @@ The PostgreSQL dialect maps `integer`, `bigint`, `text`, `boolean`, `uuid`, `dat
 
 `generateDdl(schema, dialect)` is pure and returns `{ ok: true, sql }` or `{ ok: false, issues }`. It generates only for a schema with no validation issues.
 
-- One `CREATE TABLE` per table, in schema order, with columns, `NOT NULL` where a column is not nullable, and the `PRIMARY KEY` inline.
-- All `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY` statements come after every table, so table order and circular references never matter.
+- One `CREATE TABLE` per table, with columns, `NOT NULL` where a column is not nullable, and the `PRIMARY KEY` inline.
+- A foreign key is declared inside the `CREATE TABLE` of the table that holds it, as a named constraint after the primary key, and a table is created right after the tables it references. A reference that would point at a table not yet created (a cycle) is the only one written as an `ALTER TABLE ... ADD CONSTRAINT ... FOREIGN KEY` after every table exists (core ADR-0006).
 - Identifiers are always double-quoted, with `"` escaped as `""`. The user's names are preserved, including case.
 - Constraint names are derived and deterministic (`fk_<table>_<column>`), truncated to 63 characters, the PostgreSQL limit. They are not user-editable in this slice.
 

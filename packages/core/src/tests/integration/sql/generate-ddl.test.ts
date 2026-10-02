@@ -24,30 +24,26 @@ function sqlOf(schema: Parameters<typeof generateDdl>[0]): string {
 
 const lines = (...parts: string[]) => `${parts.join('\n')}\n`
 
+const USERS_ORDERS_SQL = lines(
+  'CREATE TABLE "users" (',
+  '  "id" uuid NOT NULL,',
+  '  "name" varchar(120) NOT NULL,',
+  '  PRIMARY KEY ("id")',
+  ');',
+  '',
+  'CREATE TABLE "orders" (',
+  '  "id" uuid NOT NULL,',
+  '  "user_id" uuid NOT NULL,',
+  '  "total" numeric(10,2),',
+  '  "created_at" timestamptz NOT NULL,',
+  '  PRIMARY KEY ("id"),',
+  '  CONSTRAINT "fk_orders_user_id" FOREIGN KEY ("user_id") REFERENCES "users" ("id")',
+  ');'
+)
+
 describe('generateDdl golden output', () => {
-  it('generates users and orders with a foreign key', () => {
-    assert.equal(
-      sqlOf(usersOrders),
-      lines(
-        'CREATE TABLE "users" (',
-        '  "id" uuid NOT NULL,',
-        '  "name" varchar(120) NOT NULL,',
-        '  PRIMARY KEY ("id")',
-        ');',
-        '',
-        'CREATE TABLE "orders" (',
-        '  "id" uuid NOT NULL,',
-        '  "user_id" uuid NOT NULL,',
-        '  "total" numeric(10,2),',
-        '  "created_at" timestamptz NOT NULL,',
-        '  PRIMARY KEY ("id")',
-        ');',
-        '',
-        'ALTER TABLE "orders"',
-        '  ADD CONSTRAINT "fk_orders_user_id"',
-        '  FOREIGN KEY ("user_id") REFERENCES "users" ("id");'
-      )
-    )
+  it('declares a foreign key inside the table that holds it', () => {
+    assert.equal(sqlOf(usersOrders), USERS_ORDERS_SQL)
   })
 
   it('generates the same SQL when the schema is built through operations', () => {
@@ -71,12 +67,9 @@ describe('generateDdl golden output', () => {
         ');',
         '',
         'CREATE TABLE "orders" (',
-        '  "user_id" uuid',
-        ');',
-        '',
-        'ALTER TABLE "orders"',
-        '  ADD CONSTRAINT "fk_orders_user_id"',
-        '  FOREIGN KEY ("user_id") REFERENCES "users" ("id");'
+        '  "user_id" uuid,',
+        '  CONSTRAINT "fk_orders_user_id" FOREIGN KEY ("user_id") REFERENCES "users" ("id")',
+        ');'
       )
     )
   })
@@ -152,7 +145,7 @@ describe('generateDdl golden output', () => {
     )
   })
 
-  it('generates a self-referencing foreign key', () => {
+  it('declares a self-referencing foreign key inside its own table', () => {
     const schema = schemaOf(
       [
         table(
@@ -179,17 +172,14 @@ describe('generateDdl golden output', () => {
         'CREATE TABLE "employees" (',
         '  "id" uuid NOT NULL,',
         '  "manager_id" uuid,',
-        '  PRIMARY KEY ("id")',
-        ');',
-        '',
-        'ALTER TABLE "employees"',
-        '  ADD CONSTRAINT "fk_employees_manager_id"',
-        '  FOREIGN KEY ("manager_id") REFERENCES "employees" ("id");'
+        '  PRIMARY KEY ("id"),',
+        '  CONSTRAINT "fk_employees_manager_id" FOREIGN KEY ("manager_id") REFERENCES "employees" ("id")',
+        ');'
       )
     )
   })
 
-  it('generates circular foreign keys after every table', () => {
+  it('breaks a cycle with a single ALTER TABLE and keeps the rest inside the tables', () => {
     const schema = schemaOf(
       [
         table(
@@ -218,11 +208,29 @@ describe('generateDdl golden output', () => {
         },
       ]
     )
-    const sql = sqlOf(schema)
-    const lastCreate = sql.lastIndexOf('CREATE TABLE')
-    const firstAlter = sql.indexOf('ALTER TABLE')
-    assert.ok(firstAlter > lastCreate)
-    assert.equal((sql.match(/ALTER TABLE/g) ?? []).length, 2)
+    // b is created first (a needs it); b's own reference to a would point at a
+    // table that does not exist yet, so that one, and only that one, is ALTERed.
+    assert.equal(
+      sqlOf(schema),
+      lines(
+        'CREATE TABLE "b" (',
+        '  "id" uuid NOT NULL,',
+        '  "a_id" uuid,',
+        '  PRIMARY KEY ("id")',
+        ');',
+        '',
+        'CREATE TABLE "a" (',
+        '  "id" uuid NOT NULL,',
+        '  "b_id" uuid,',
+        '  PRIMARY KEY ("id"),',
+        '  CONSTRAINT "fk_a_b_id" FOREIGN KEY ("b_id") REFERENCES "b" ("id")',
+        ');',
+        '',
+        'ALTER TABLE "b"',
+        '  ADD CONSTRAINT "fk_b_a_id"',
+        '  FOREIGN KEY ("a_id") REFERENCES "a" ("id");'
+      )
+    )
   })
 
   it('truncates long constraint names and keeps them unique', () => {
@@ -252,7 +260,7 @@ describe('generateDdl golden output', () => {
       ]
     )
     const sql = sqlOf(schema)
-    const names = [...sql.matchAll(/ADD CONSTRAINT "([^"]+)"/g)].map(
+    const names = [...sql.matchAll(/CONSTRAINT "([^"]+)"/g)].map(
       (match) => match[1] ?? ''
     )
     assert.equal(names.length, 2)
@@ -376,9 +384,9 @@ describe('generateDdl with generated columns', () => {
 
   it('generates exactly the same SQL for a schema saved before generated columns existed', () => {
     assert.equal(
-      sqlOf(usersOrders),
-      sqlOf(JSON.parse(JSON.stringify(usersOrders)))
+      sqlOf(JSON.parse(JSON.stringify(usersOrders))),
+      USERS_ORDERS_SQL
     )
-    assert.ok(!sqlOf(usersOrders).includes('GENERATED'))
+    assert.ok(!USERS_ORDERS_SQL.includes('GENERATED'))
   })
 })
