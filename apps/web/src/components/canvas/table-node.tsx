@@ -7,6 +7,7 @@ import type { TableFlowNode } from '../../lib/canvas/to-flow.ts'
 import { handleId } from '../../lib/canvas/to-flow.ts'
 import { formatColumnType } from '../../lib/column-types.ts'
 import type { Side } from '../../lib/geometry.ts'
+import { relatedTables } from '../../lib/relationships.ts'
 
 /**
  * A connection point on one side of a column row. A source and a target sit on the
@@ -29,6 +30,12 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
     state.schema.tables.find((candidate) => candidate.id === data.tableId)
   )
   const hovered = useForgeStore((state) => state.hoveredTable === data.tableId)
+  const relatedToHovered = useForgeStore(
+    (state) =>
+      state.hoveredTable !== null &&
+      state.hoveredTable !== data.tableId &&
+      relatedTables(state.schema, state.hoveredTable).has(data.tableId)
+  )
   const updateNodeInternals = useUpdateNodeInternals()
 
   // React Flow measures handle positions once; adding, removing or reordering
@@ -42,7 +49,14 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
   if (!table) return null
 
   return (
-    <div className={hovered ? 'table-node table-node--hovered' : 'table-node'}>
+    <div
+      className={
+        hovered
+          ? 'table-node table-node--hovered'
+          : relatedToHovered
+            ? 'table-node table-node--related-hover'
+            : 'table-node'
+      }>
       <div className='table-node__title'>{table.name || '(unnamed)'}</div>
       <ul className='table-node__columns'>
         {table.columns.map((column) => (

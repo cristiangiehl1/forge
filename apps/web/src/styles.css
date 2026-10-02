@@ -7,6 +7,7 @@
   --muted: #667085;
   --accent: #2f6fed;
   --edge: #5b6b8c;
+  --related: #d97706;
   --error-bg: #fdecec;
   --error-text: #8a1c1c;
   --warn-bg: #fff6df;
@@ -22,6 +23,7 @@
     --muted: #9aa4b5;
     --accent: #6c9bff;
     --edge: #9db0d6;
+    --related: #fbbf24;
     --error-bg: #3a1b1b;
     --error-text: #ffb4b4;
     --warn-bg: #3a2e12;
@@ -305,6 +307,11 @@ button {
 .table-node--hovered {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent);
+}
+
+.table-node--related-hover {
+  border-color: var(--related);
+  box-shadow: 0 0 0 2px var(--related);
 }
 
 .react-flow__edge.related .react-flow__edge-path {
