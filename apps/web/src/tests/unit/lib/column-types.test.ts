@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { MAX_NUMERIC_PRECISION, MAX_VARCHAR_LENGTH } from '@forge/core'
+import {
+  MAX_NUMERIC_PRECISION,
+  MAX_VARCHAR_LENGTH,
+  SIMPLE_COLUMN_KINDS,
+} from '@forge/core'
 
 import {
   COLUMN_KINDS,
@@ -13,21 +17,10 @@ import {
 } from '../../../lib/column-types.ts'
 
 describe('COLUMN_KINDS', () => {
-  it('lists the simple kinds, then varchar and numeric', () => {
+  it('lists the simple kinds, then varchar, char and numeric', () => {
     assert.deepEqual(
       [...COLUMN_KINDS],
-      [
-        'integer',
-        'bigint',
-        'text',
-        'boolean',
-        'uuid',
-        'timestamp',
-        'date',
-        'json',
-        'varchar',
-        'numeric',
-      ]
+      [...SIMPLE_COLUMN_KINDS, 'varchar', 'char', 'numeric']
     )
   })
 })

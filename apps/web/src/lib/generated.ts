@@ -1,9 +1,6 @@
 import type { Column, ColumnType } from '@forge/core'
 import { GENERATED_COLUMN_KINDS, postgres } from '@forge/core'
 
-import type { ColumnKind } from './column-types.ts'
-import { defaultColumnType } from './column-types.ts'
-
 /** Whether the database can generate values for a column of this type. */
 export function supportsGenerated(type: ColumnType): boolean {
   return (GENERATED_COLUMN_KINDS as readonly string[]).includes(type.kind)
@@ -16,9 +13,8 @@ export function supportsGenerated(type: ColumnType): boolean {
  */
 export function typeChangePatch(
   column: Column,
-  kind: ColumnKind
+  type: ColumnType
 ): Partial<Omit<Column, 'id'>> {
-  const type = defaultColumnType(kind)
   return column.generated && !supportsGenerated(type)
     ? { type, generated: false }
     : { type }
