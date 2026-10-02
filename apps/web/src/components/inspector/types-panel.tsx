@@ -117,27 +117,29 @@ export function TypesPanel() {
   return (
     <>
       <h2 className='inspector__heading'>Types</h2>
-      {types.length === 0 && (
-        <p className='inspector__hint'>
-          No custom types. An enum lists its values; a domain narrows a base
-          type.
-        </p>
-      )}
+      <p className='inspector__hint'>
+        An <strong>enum</strong> is a fixed list of values a column can hold
+        (for example pending, paid, shipped). A <strong>domain</strong> is a
+        base type with its own rules, such as NOT NULL and a default, that
+        several columns can share (for example an email type built on text).
+      </p>
       <ul className='column-list'>
         {types.map((type) => (
           <TypeRow key={type.id} type={type} schema={schema} />
         ))}
       </ul>
-      <button
-        type='button'
-        onClick={() => forgeStore.getState().addType('enum')}>
-        Add enum
-      </button>
-      <button
-        type='button'
-        onClick={() => forgeStore.getState().addType('domain')}>
-        Add domain
-      </button>
+      <div className='inspector__actions'>
+        <button
+          type='button'
+          onClick={() => forgeStore.getState().addType('enum')}>
+          Add enum
+        </button>
+        <button
+          type='button'
+          onClick={() => forgeStore.getState().addType('domain')}>
+          Add domain
+        </button>
+      </div>
     </>
   )
 }

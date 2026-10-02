@@ -82,12 +82,14 @@ export function IndexList({ table }: { table: Table }) {
           <IndexRow key={index.id} table={table} index={index} />
         ))}
       </ul>
-      <button
-        type='button'
-        disabled={table.columns.length === 0}
-        onClick={() => forgeStore.getState().addIndex(table.id)}>
-        Add index
-      </button>
+      <div className='inspector__actions'>
+        <button
+          type='button'
+          disabled={table.columns.length === 0}
+          onClick={() => forgeStore.getState().addIndex(table.id)}>
+          Add index
+        </button>
+      </div>
     </>
   )
 }

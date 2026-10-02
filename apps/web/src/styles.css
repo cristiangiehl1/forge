@@ -429,3 +429,12 @@ button {
   transform: translateX(-50%);
   pointer-events: none;
 }
+
+/* Buttons that sit under a list in the Inspector: apart from each other and
+   from the list above them. */
+.inspector__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
