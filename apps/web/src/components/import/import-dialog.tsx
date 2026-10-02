@@ -1,8 +1,9 @@
 import type { ImportResult } from '@forge/core'
 import { importSql } from '@forge/core'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
+import { debounce } from '../../lib/import/debounce.ts'
 import { describeLimit, tooBig } from '../../lib/import/limits.ts'
 import {
   describeSummary,
@@ -21,40 +22,75 @@ interface Parsed {
   result: ImportResult
 }
 
-function parse(text: string): Parsed {
+function parse(text: string): Parsed | null {
+  if (text.trim() === '') return null
   return { text, result: importSql(text, () => crypto.randomUUID()) }
 }
 
+/** How long the text must rest before it is parsed again. */
+const PARSE_DELAY_MS = 300
+
 export function ImportDialog({ onClose }: { onClose: () => void }) {
   const hasTables = useForgeStore((state) => state.schema.tables.length > 0)
+  const [text, setText] = useState('')
   const [parsed, setParsed] = useState<Parsed | null>(null)
+  // The preview lags the text by the debounce; Import waits for it to catch up.
+  const [pending, setPending] = useState(false)
   const [mode, setMode] = useState<Mode>('add')
   const [fileError, setFileError] = useState<string | null>(null)
+  const [later] = useState(() =>
+    debounce(PARSE_DELAY_MS, (value: string) => {
+      setParsed(parse(value))
+      setPending(false)
+    })
+  )
+  const dialogRef = useRef<HTMLDialogElement | null>(null)
+  useEffect(() => () => later.cancel(), [later])
 
-  function change(text: string) {
+  function edit(next: string, immediate: boolean) {
+    setText(next)
     setFileError(null)
-    if (tooBig(new Blob([text]).size)) {
+    if (tooBig(new Blob([next]).size)) {
+      later.cancel()
+      setPending(false)
       setParsed(null)
       setFileError(`The script is over ${describeLimit()}.`)
       return
     }
-    setParsed(text.trim() === '' ? null : parse(text))
+    if (immediate) {
+      later.cancel()
+      setPending(false)
+      setParsed(parse(next))
+      return
+    }
+    setPending(true)
+    later.run(next)
   }
 
   async function loadFile(file: File | undefined) {
     if (!file) return
     if (tooBig(file.size)) {
+      later.cancel()
+      setPending(false)
       setParsed(null)
       setFileError(`"${file.name}" is over ${describeLimit()}.`)
       return
     }
-    change(await file.text())
+    edit(await file.text(), true)
+  }
+
+  // Closing the dialog itself (not unmounting it) lets the browser give the
+  // focus back to the button that opened it.
+  function close() {
+    if (dialogRef.current) dialogRef.current.close()
+    else onClose()
   }
 
   const summary = parsed ? summarize(parsed.result.schema) : null
   const errors = parsed?.result.errors ?? []
   const warnings = parsed?.result.warnings ?? []
   const canImport =
+    !pending &&
     parsed !== null &&
     summary !== null &&
     errors.length === 0 &&
@@ -66,7 +102,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     forgeStore
       .getState()
       .importSchema(parsed.result.schema, replacing ? 'replace' : 'add')
-    onClose()
+    close()
   }
 
   const shownWarnings = limitMessages(warnings, MAX_LISTED)
@@ -77,6 +113,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       className='import-dialog'
       aria-label='Import SQL'
       ref={(element) => {
+        dialogRef.current = element
         if (element && !element.open) element.showModal()
       }}
       onClose={onClose}>
@@ -95,8 +132,8 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           rows={10}
           spellCheck={false}
           placeholder='CREATE TABLE users (id integer PRIMARY KEY, …);'
-          defaultValue={parsed?.text ?? ''}
-          onChange={(event) => change(event.target.value)}
+          value={text}
+          onChange={(event) => edit(event.target.value, false)}
         />
       </label>
       <label className='field'>
@@ -115,6 +152,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       )}
 
       <section aria-label='Import preview' className='import-dialog__preview'>
+        {pending && <p className='inspector__hint'>Updating the preview…</p>}
         {summary === null ? (
           <p className='inspector__hint'>Nothing to preview yet.</p>
         ) : (
@@ -205,7 +243,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
             Import
           </button>
         )}
-        <button type='button' onClick={onClose}>
+        <button type='button' onClick={close}>
           Cancel
         </button>
       </div>

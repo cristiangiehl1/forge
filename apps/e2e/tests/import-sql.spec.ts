@@ -129,16 +129,75 @@ test.describe('importing SQL', () => {
     await expect(editor.node('from_file')).toBeVisible()
   })
 
-  test('a file over 2 MB is refused', async ({ page }) => {
+  test('a file loaded after typing replaces the text in the box, and is what gets imported', async ({
+    page,
+  }) => {
+    const editor = await openImport(page)
+    const file = path.join(
+      mkdtempSync(path.join(tmpdir(), 'forge-')),
+      'schema.sql'
+    )
+    writeFileSync(file, 'CREATE TABLE from_file (id int PRIMARY KEY);')
+    await page.getByRole('button', { name: 'Import SQL' }).click()
+    await sqlBox(page).fill('CREATE TABLE typed (id int);')
+    await dialog(page).getByLabel('SQL file').setInputFiles(file)
+    await expect(sqlBox(page)).toHaveValue(/from_file/)
+    await expect(
+      dialog(page).getByRole('region', { name: 'Import preview' })
+    ).toContainText('1 table')
+    await dialog(page)
+      .getByRole('button', { name: 'Import', exact: true })
+      .click()
+    await expect(editor.node('from_file')).toBeVisible()
+    await expect(editor.tables()).toHaveCount(1)
+  })
+
+  test('closing the dialog, by Cancel or by importing, puts the focus back on the Import SQL button', async ({
+    page,
+  }) => {
+    await openImport(page)
+    const button = page.getByRole('button', { name: 'Import SQL' })
+    await button.click()
+    await dialog(page).getByRole('button', { name: 'Cancel' }).click()
+    await expect(button).toBeFocused()
+
+    await button.click()
+    await sqlBox(page).fill('CREATE TABLE a (id int);')
+    await dialog(page)
+      .getByRole('button', { name: 'Import', exact: true })
+      .click()
+    await expect(button).toBeFocused()
+  })
+
+  test('Import stays disabled while the preview is catching up with the text', async ({
+    page,
+  }) => {
+    await openImport(page)
+    await page.getByRole('button', { name: 'Import SQL' }).click()
+    await sqlBox(page).fill('CREATE TABLE a (id int);')
+    // The first fill is still being parsed; a second edit must not be importable
+    // until the preview shows it.
+    await sqlBox(page).fill('CREATE TABLE b (y);')
+    await expect(
+      dialog(page)
+        .getByRole('region', { name: 'Import preview' })
+        .getByRole('list', { name: 'Errors' })
+    ).toBeVisible()
+    await expect(
+      dialog(page).getByRole('button', { name: 'Import', exact: true })
+    ).toBeDisabled()
+  })
+
+  test('a file over 1 MB is refused', async ({ page }) => {
     await openImport(page)
     const file = path.join(
       mkdtempSync(path.join(tmpdir(), 'forge-')),
       'big.sql'
     )
-    writeFileSync(file, `-- ${'x'.repeat(2 * 1024 * 1024 + 10)}\n`)
+    writeFileSync(file, `-- ${'x'.repeat(1024 * 1024 + 10)}\n`)
     await page.getByRole('button', { name: 'Import SQL' }).click()
     await dialog(page).getByLabel('SQL file').setInputFiles(file)
-    await expect(dialog(page).getByRole('alert')).toContainText('over 2 MB')
+    await expect(dialog(page).getByRole('alert')).toContainText('over 1 MB')
     await expect(
       dialog(page).getByRole('button', { name: 'Import', exact: true })
     ).toBeDisabled()

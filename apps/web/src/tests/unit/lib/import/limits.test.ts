@@ -8,9 +8,9 @@ import {
 } from '../../../../lib/import/limits.ts'
 
 describe('the size limit', () => {
-  it('is 2 MB, and a size over it is too big', () => {
-    assert.equal(MAX_SQL_BYTES, 2 * 1024 * 1024)
-    assert.equal(describeLimit(), '2 MB')
+  it('is 1 MB, and a size over it is too big', () => {
+    assert.equal(MAX_SQL_BYTES, 1024 * 1024)
+    assert.equal(describeLimit(), '1 MB')
     assert.equal(tooBig(MAX_SQL_BYTES), false)
     assert.equal(tooBig(MAX_SQL_BYTES + 1), true)
     assert.equal(tooBig(0), false)
