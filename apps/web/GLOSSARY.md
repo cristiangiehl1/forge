@@ -47,3 +47,9 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 **Add**: the Import dialog's default when the project has tables. It appends the imported tables, renaming a table, index or type whose name is taken (`users_2`, `users_3`…), and places only the new tables, to the right of the existing ones. The viewport and the user's positions are left alone.
 
 **Replace**: the Import dialog's other mode. It swaps the whole project for the script and lays the tables out by their relationships; it asks for a second click, like Load example.
+
+**History**: the steps that can be undone and redone: snapshots of the schema and of where the tables are (not the zoom, the selection or the preferences). It is kept in memory, holds at most 100 steps, and starts empty whenever a project is loaded or started.
+
+**Step**: what one undo reverts: one click on a button, one drag of a table, or a run of edits to the same field with pauses shorter than a second (typing a name). Loading the example and importing a script are steps too; undoing them also fits the canvas.
+
+**Undo / Redo**: the toolbar buttons and Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z and Ctrl+Y. They keep the zoom, clear a selection or hover that points at something that is gone, and work in the Inspector's fields; inside a dialog the browser's own undo applies.
