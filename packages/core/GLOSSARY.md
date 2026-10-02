@@ -35,3 +35,9 @@ The vocabulary of the domain model. Nothing here knows about the canvas.
 **Comment**: free text on a Table or a Column, written as `COMMENT ON`. Blank means none.
 
 **Import**: reading a PostgreSQL script into a Schema with `importSql`. It returns the schema, the **warnings** (valid SQL that Forge does not model, each with its line) and the **errors** (a statement it should understand but cannot, a cut-off script, or a result that is not a valid Schema). It reads `CREATE TABLE`, `ALTER TABLE … ADD CONSTRAINT` / `ALTER COLUMN … SET DEFAULT` / `ADD GENERATED`, `CREATE [UNIQUE] INDEX`, `CREATE TYPE … AS ENUM`, `CREATE DOMAIN` and `COMMENT ON TABLE/COLUMN`; everything else is a warning.
+
+**Dialect**: the database a script is written for, `postgres` or `oracle`. A project has one (default PostgreSQL) and may have options, such as how Oracle stores a uuid. A dialect owns the SQL forms: the type names, the lines of a `CREATE TABLE`, the index statement, the names of generated constraints, and what makes a schema impossible for it.
+
+**Compatibility note**: something a dialect adapted or could not translate (an array stored as JSON, an index that is not created, a default copied as written). The script is still written; each note cites its table, column or index.
+
+**Dialect issue**: what makes the schema impossible in a dialect (a key over a `CLOB`/`BLOB`, names that collide once upper-cased, a name that is too long). It blocks the script, like any issue.

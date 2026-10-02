@@ -55,3 +55,7 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 **Undo / Redo**: the toolbar buttons and Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z and Ctrl+Y. They keep the zoom, clear a selection or hover that points at something that is gone, and work in the Inspector's fields; inside a dialog the browser's own undo applies.
 
 **Download .sql**: the DDL panel's button next to Copy. It saves the very script the panel shows, as `forge-schema.sql` (UTF-8), through a temporary link released at once. It is not shown when the project is empty or when the schema has problems, like Copy.
+
+**Dialect selector**: the toolbar's choice of PostgreSQL or Oracle (and, for Oracle, how a uuid is stored). It is saved with the project, changes the DDL at once, and is not an undo step. Importing SQL still reads PostgreSQL, and the dialog says so under Oracle.
+
+**Compatibility notes**: the list under the DDL panel's buttons: what the chosen dialect adapted or copied as written, each citing its table or column.
