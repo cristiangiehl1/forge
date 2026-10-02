@@ -186,9 +186,7 @@ describe('generateDdl with Oracle', () => {
     assert.deepEqual(
       result.notes.map((n) => [n.code, n.tableId, n.columnId ?? n.indexId]),
       [
-        ['raw-default', 'users', 'u3'],
         ['array-as-json', 'users', 'u5'],
-        ['raw-default', 'orders', 'o3'],
         ['index-on-lob', 'users', 'i2'],
       ]
     )

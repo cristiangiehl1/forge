@@ -34,9 +34,16 @@ const PLAIN = /^[A-Za-z][A-Za-z0-9_$#]*$/
 const isPlain = (name: string) =>
   PLAIN.test(name) && !RESERVED.has(name.toUpperCase())
 
+/**
+ * Oracle cannot hold a double quote in a name, quoted or not, so nothing is
+ * escaped here: `check` refuses such a name before a script is written.
+ */
 function quoteIdentifier(name: string): string {
-  return isPlain(name) ? name.toUpperCase() : `"${name.replaceAll('"', '""')}"`
+  return isPlain(name) ? name.toUpperCase() : `"${name}"`
 }
+
+const hasForbiddenChar = (name: string): boolean =>
+  name.includes('"') || name.includes('\0')
 
 /** What a name is once Oracle has folded it: two names with the same fold collide. */
 const fold = (name: string): string =>
@@ -67,6 +74,33 @@ interface Resolved {
   note?: { code: string; message: (where: string) => string }
   /** A domain's default and NOT NULL, repeated on the column. */
   domain?: { default?: string; notNull?: boolean }
+  /** What a default written for this column may need translated. */
+  defaultKind?: 'boolean' | 'timestamp' | 'timestamp_no_tz'
+}
+
+const NOW =
+  /^(now\(\)|current_timestamp|transaction_timestamp\(\)|statement_timestamp\(\)|clock_timestamp\(\))$/i
+const PLAIN_LITERAL = /^(-?\d+(\.\d+)?|'(?:[^']|'')*'|null)$/i
+
+/**
+ * A default as Oracle spells it. What has one spelling is translated; a plain
+ * literal is kept; anything else is copied as written, with a note.
+ */
+function translateDefault(
+  text: string,
+  kind: Resolved['defaultKind']
+): { sql: string; note: boolean } {
+  const trimmed = text.trim()
+  if (kind === 'boolean' && /^true$/i.test(trimmed))
+    return { sql: '1', note: false }
+  if (kind === 'boolean' && /^false$/i.test(trimmed))
+    return { sql: '0', note: false }
+  if (kind === 'timestamp' && NOW.test(trimmed))
+    return { sql: 'SYSTIMESTAMP', note: false }
+  if (kind === 'timestamp_no_tz' && NOW.test(trimmed)) {
+    return { sql: 'LOCALTIMESTAMP', note: false }
+  }
+  return { sql: text, note: !PLAIN_LITERAL.test(trimmed) }
 }
 
 function resolveType(
@@ -84,12 +118,12 @@ function resolveType(
     case 'numeric':
       if (type.precision > MAX_NUMBER_PRECISION) {
         return {
-          sql: `NUMBER(${MAX_NUMBER_PRECISION},${Math.min(type.scale, MAX_NUMBER_PRECISION)})`,
+          sql: `NUMBER(${MAX_NUMBER_PRECISION},${Math.max(0, MAX_NUMBER_PRECISION - (type.precision - type.scale))})`,
           lob: false,
           note: {
             code: 'numeric-precision',
             message: (where) =>
-              `${where}: the precision ${type.precision} was lowered to ${MAX_NUMBER_PRECISION}, the most Oracle allows.`,
+              `${where}: the precision ${type.precision} was lowered to ${MAX_NUMBER_PRECISION}, the most Oracle allows; the integer digits were kept and the scale gave way.`,
           },
         }
       }
@@ -127,6 +161,7 @@ function resolveType(
         sql: 'NUMBER(1)',
         lob: false,
         check: (column) => `${column} IN (0,1)`,
+        defaultKind: 'boolean',
       }
     case 'uuid':
       return {
@@ -134,9 +169,13 @@ function resolveType(
         lob: false,
       }
     case 'timestamp':
-      return { sql: 'TIMESTAMP WITH TIME ZONE', lob: false }
+      return {
+        sql: 'TIMESTAMP WITH TIME ZONE',
+        lob: false,
+        defaultKind: 'timestamp',
+      }
     case 'timestamp_no_tz':
-      return { sql: 'TIMESTAMP', lob: false }
+      return { sql: 'TIMESTAMP', lob: false, defaultKind: 'timestamp_no_tz' }
     case 'date':
       return { sql: 'DATE', lob: false }
     case 'time':
@@ -239,13 +278,16 @@ export function oracle(options: DialectOptions = {}): Dialect {
         : resolved.domain?.default
       let fallback = ''
       if (!column.generated && present(written)) {
-        fallback = ` DEFAULT ${written}`
-        notes.push({
-          code: 'raw-default',
-          message: `${where}: the default ${written} is copied as written and may be specific to another database.`,
-          tableId: table.id,
-          columnId: column.id,
-        })
+        const translated = translateDefault(written, resolved.defaultKind)
+        fallback = ` DEFAULT ${translated.sql}`
+        if (translated.note) {
+          notes.push({
+            code: 'raw-default',
+            message: `${where}: the default ${written} is copied as written and may be specific to another database.`,
+            tableId: table.id,
+            columnId: column.id,
+          })
+        }
       }
       const generated = column.generated ? generatedClause(column.type) : null
       const inKey = table.primaryKey.includes(column.id)
@@ -329,7 +371,17 @@ export function oracle(options: DialectOptions = {}): Dialect {
     const issues: Issue[] = []
     const tooLong = (name: string) => byteLength(name) > MAX_NAME_BYTES
     const tableNames = new Map<string, string>()
+    const invalid = (what: string, name: string, ids: Partial<Issue>) => {
+      if (!hasForbiddenChar(name)) return false
+      issues.push({
+        code: 'dialect-name-invalid',
+        message: `${what} "${name}" contains a double quote, which Oracle does not accept in a name.`,
+        ...ids,
+      } as Issue)
+      return true
+    }
     for (const table of schema.tables) {
+      if (invalid('Table', table.name, { tableId: table.id })) continue
       if (tooLong(table.name)) {
         issues.push({
           code: 'dialect-name-too-long',
@@ -350,6 +402,14 @@ export function oracle(options: DialectOptions = {}): Dialect {
       }
       const columnNames = new Map<string, string>()
       for (const column of table.columns) {
+        if (
+          invalid('Column', column.name, {
+            tableId: table.id,
+            columnId: column.id,
+          })
+        ) {
+          continue
+        }
         if (tooLong(column.name)) {
           issues.push({
             code: 'dialect-name-too-long',
@@ -372,6 +432,43 @@ export function oracle(options: DialectOptions = {}): Dialect {
         }
       }
     }
+    // Tables, indexes and the indexes of primary keys share one namespace.
+    const taken = new Map<string, string>()
+    for (const table of schema.tables)
+      taken.set(fold(table.name), `the table "${table.name}"`)
+    for (const table of schema.tables) {
+      if (table.primaryKey.length > 0) {
+        const key = fold(constraintName('pk', [table.name]))
+        if (!taken.has(key))
+          taken.set(key, `the primary key of "${table.name}"`)
+      }
+    }
+    const indexNames = new Map<string, string>()
+    for (const table of schema.tables) {
+      for (const index of (table.indexes ?? []) as Index[]) {
+        const ids = { tableId: table.id, indexId: index.id }
+        if (invalid('Index', index.name, ids)) continue
+        if (tooLong(index.name)) {
+          issues.push({
+            code: 'dialect-name-too-long',
+            message: `Index "${index.name}" has a name longer than the ${MAX_NAME_BYTES} bytes Oracle allows.`,
+            ...ids,
+          })
+        }
+        const key = fold(index.name)
+        const other = indexNames.get(key) ?? taken.get(key)
+        if (other !== undefined) {
+          issues.push({
+            code: 'dialect-name-collision',
+            message: `Index "${index.name}" has the same name in Oracle (${key}) as ${indexNames.has(key) ? `the index "${other}"` : other}.`,
+            ...ids,
+          })
+        } else {
+          indexNames.set(key, index.name)
+        }
+      }
+    }
+
     const lobKey = (tableId: string, columnId: string, what: string) => {
       const table = schema.tables.find((candidate) => candidate.id === tableId)
       const column = table?.columns.find(

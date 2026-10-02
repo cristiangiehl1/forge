@@ -33,7 +33,6 @@ describe('oracle: names', () => {
     assert.equal(dialect.quoteIdentifier('a-b'), '"a-b"')
     assert.equal(dialect.quoteIdentifier('1abc'), '"1abc"')
     assert.equal(dialect.quoteIdentifier('_x'), '"_x"')
-    assert.equal(dialect.quoteIdentifier('say "hi"'), '"say ""hi"""')
   })
 
   it('names generated constraints in upper case', () => {
@@ -283,24 +282,69 @@ describe('oracle: a table', () => {
     ])
   })
 
-  it('notes a raw default, a long varchar and an over-precise numeric, and adapts them', () => {
+  it('notes a default it cannot translate, a long varchar and an over-precise numeric, and adapts them', () => {
     const schema = schemaOf([
       tbl('t', 'stuff', [
-        col('a', 'created', { kind: 'timestamp' }, { default: 'now()' }),
+        col('a', 'created', { kind: 'timestamp' }, { default: 'lower(name)' }),
         col('b', 'body', { kind: 'varchar', length: 5000 }),
         col('c', 'amount', { kind: 'numeric', precision: 50, scale: 4 }),
       ]),
     ])
     const result = parts(schema, 't')
     assert.deepEqual(result.columns, [
-      '  CREATED TIMESTAMP WITH TIME ZONE DEFAULT now()',
+      '  CREATED TIMESTAMP WITH TIME ZONE DEFAULT lower(name)',
       '  BODY CLOB',
-      '  AMOUNT NUMBER(38,4)',
+      '  AMOUNT NUMBER(38,0)',
     ])
     assert.deepEqual(
       result.notes.map((n) => n.code),
       ['raw-default', 'text-too-long', 'numeric-precision']
     )
+  })
+
+  it('keeps the integer digits when it lowers the precision: the scale gives way', () => {
+    const wide = (precision: number, scale: number) =>
+      parts(
+        schemaOf([
+          tbl('t', 'x', [col('a', 'n', { kind: 'numeric', precision, scale })]),
+        ]),
+        't'
+      ).columns[0]
+    assert.equal(wide(50, 45), '  N NUMBER(38,33)')
+    assert.equal(wide(60, 55), '  N NUMBER(38,33)')
+    assert.equal(wide(50, 4), '  N NUMBER(38,0)')
+  })
+
+  it('translates the defaults that have one Oracle spelling, and does not note them or plain literals', () => {
+    const schema = schemaOf([
+      tbl('t', 'x', [
+        col('a', 'on1', { kind: 'boolean' }, { default: 'true' }),
+        col('b', 'on2', { kind: 'boolean' }, { default: 'FALSE' }),
+        col('c', 'at1', { kind: 'timestamp' }, { default: 'now()' }),
+        col(
+          'd',
+          'at2',
+          { kind: 'timestamp' },
+          { default: 'CURRENT_TIMESTAMP' }
+        ),
+        col('e', 'at3', { kind: 'timestamp_no_tz' }, { default: 'now()' }),
+        col('f', 'n', { kind: 'integer' }, { default: '0' }),
+        col('g', 's', { kind: 'varchar', length: 9 }, { default: "'it''s'" }),
+        col('h', 'z', { kind: 'varchar', length: 9 }, { default: 'NULL' }),
+      ]),
+    ])
+    const result = parts(schema, 't')
+    assert.deepEqual(result.columns, [
+      '  ON1 NUMBER(1) DEFAULT 1',
+      '  ON2 NUMBER(1) DEFAULT 0',
+      '  AT1 TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP',
+      '  AT2 TIMESTAMP WITH TIME ZONE DEFAULT SYSTIMESTAMP',
+      '  AT3 TIMESTAMP DEFAULT LOCALTIMESTAMP',
+      '  N NUMBER(10) DEFAULT 0',
+      "  S VARCHAR2(9) DEFAULT 'it''s'",
+      '  Z VARCHAR2(9) DEFAULT NULL',
+    ])
+    assert.deepEqual(result.notes, [])
   })
 
   it('writes a uuid as VARCHAR2(36) with the hyphenated default when asked', () => {
@@ -456,6 +500,59 @@ describe('oracle: what blocks', () => {
       codes(schemaOf([tbl('1', 'order', []), tbl('2', 'orders', [])])),
       []
     )
+  })
+
+  it('refuses index names that are the same once folded, an index named like a table or like the primary key, and a long index name', () => {
+    const t = (indexes: Table['indexes'], extra: Partial<Table> = {}) =>
+      tbl('t', 'users', [col('a', 'email', { kind: 'varchar', length: 9 })], {
+        indexes,
+        ...extra,
+      })
+    const ix = (id: string, name: string) => ({
+      id,
+      name,
+      columns: ['a'],
+      unique: false,
+      method: 'btree' as const,
+    })
+    assert.deepEqual(
+      codes(schemaOf([t([ix('1', 'idx_a'), ix('2', 'IDX_A')])])),
+      ['dialect-name-collision']
+    )
+    assert.deepEqual(
+      codes(schemaOf([t([ix('1', 'pk_users')], { primaryKey: ['a'] })])),
+      ['dialect-name-collision']
+    )
+    assert.deepEqual(codes(schemaOf([t([ix('1', 'USERS')])])), [
+      'dialect-name-collision',
+    ])
+    assert.deepEqual(codes(schemaOf([t([ix('1', 'i'.repeat(129))])])), [
+      'dialect-name-too-long',
+    ])
+  })
+
+  it('refuses a name that contains a double quote, which Oracle cannot hold', () => {
+    assert.deepEqual(codes(schemaOf([tbl('1', 'say "hi"', [])])), [
+      'dialect-name-invalid',
+    ])
+    assert.deepEqual(
+      codes(schemaOf([tbl('1', 't', [col('a', 'a"b', { kind: 'text' })])])),
+      ['dialect-name-invalid']
+    )
+    const idx = schemaOf([
+      tbl('1', 't', [col('a', 'x', { kind: 'varchar', length: 9 })], {
+        indexes: [
+          {
+            id: 'i',
+            name: 'i"x',
+            columns: ['a'],
+            unique: false,
+            method: 'btree',
+          },
+        ],
+      }),
+    ])
+    assert.deepEqual(codes(idx), ['dialect-name-invalid'])
   })
 
   it('refuses a name longer than 128 bytes', () => {

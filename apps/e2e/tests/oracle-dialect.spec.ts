@@ -41,17 +41,53 @@ test.describe('the Oracle dialect', () => {
   test('the notes list what was adapted, and Oracle can be left again', async ({
     page,
   }) => {
-    const editor = await exampleInOracle(page)
+    await page.setViewportSize({ width: 1400, height: 900 })
+    const editor = new Editor(page)
+    await editor.open()
+    await page.getByLabel('Dialect').selectOption('oracle')
+    await page.getByRole('button', { name: 'Import SQL' }).click()
+    await page
+      .getByRole('dialog')
+      .getByLabel('SQL', { exact: true })
+      .fill(
+        "CREATE TABLE t (id int PRIMARY KEY, tags text[], created timestamptz DEFAULT lower('x'), ok boolean DEFAULT true);"
+      )
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: 'Import', exact: true })
+      .click()
     await editor.showDdl()
+
     const notes = page.getByRole('list', { name: 'Compatibility notes' })
+    await expect(notes).toContainText('stored as a JSON array')
     await expect(notes).toContainText('copied as written')
-    await expect(page.getByText(/Compatibility notes \(\d+\)/)).toBeVisible()
+    // A boolean default of true is translated, not noted.
+    await expect(notes).not.toContainText('true')
+    await expect(page.getByText(/Compatibility notes \(2\)/)).toBeVisible()
+    expect(await editor.ddl()).toContain('OK NUMBER(1) DEFAULT 1')
 
     await page.getByLabel('Dialect').selectOption('postgres')
     await expect(
       page.getByRole('list', { name: 'Compatibility notes' })
     ).toHaveCount(0)
-    expect(await editor.ddl()).toContain('CREATE TABLE "users" (')
+    expect(await editor.ddl()).toContain('CREATE TABLE "t" (')
+  })
+
+  test('an untouched project is saved without a dialect until one is chosen', async ({
+    page,
+  }) => {
+    const editor = new Editor(page)
+    await editor.open()
+    await editor.addTable('plain')
+    await page.waitForTimeout(900)
+    const saved = () =>
+      page.evaluate(() => window.localStorage.getItem('forge:project') ?? '')
+    expect(await saved()).toContain('"plain"')
+    expect(await saved()).not.toContain('"dialect"')
+
+    await page.getByLabel('Dialect').selectOption('oracle')
+    await page.waitForTimeout(900)
+    expect(await saved()).toContain('"dialect":"oracle"')
   })
 
   test('the uuid option appears only with Oracle and changes the column', async ({

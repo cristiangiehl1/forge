@@ -37,6 +37,7 @@ export type IssueCode =
   | 'name-collision'
   | 'dialect-name-too-long'
   | 'dialect-name-collision'
+  | 'dialect-name-invalid'
   | 'dialect-lob-key'
   | 'multiple-relationships-from-column'
   | 'relationship-unknown-column'

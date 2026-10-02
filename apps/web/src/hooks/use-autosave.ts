@@ -1,6 +1,7 @@
 import { createProject } from '@forge/core'
 import { useEffect } from 'react'
 
+import { dialectSettings } from '../lib/dialect-settings.ts'
 import { localStorageProject } from '../lib/storage/default-storage.ts'
 import { saveProject } from '../queries/project/save-project.ts'
 import { useSaveProject } from '../queries/project/use-save-project.ts'
@@ -26,7 +27,7 @@ export function useAutosave(): string | null {
     const timer = setTimeout(
       () =>
         mutate(
-          createProject(schema, view, { dialect, options: dialectOptions })
+          createProject(schema, view, dialectSettings(dialect, dialectOptions))
         ),
       AUTOSAVE_DELAY_MS
     )
@@ -40,10 +41,11 @@ export function useAutosave(): string | null {
       if (state.persistence !== 'ready') return
       saveProject(
         localStorageProject,
-        createProject(state.schema, state.view, {
-          dialect: state.dialect,
-          options: state.dialectOptions,
-        })
+        createProject(
+          state.schema,
+          state.view,
+          dialectSettings(state.dialect, state.dialectOptions)
+        )
       )
     }
     window.addEventListener('pagehide', flush)
