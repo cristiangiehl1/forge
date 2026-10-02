@@ -40,7 +40,7 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 
 **UQ badge**: the mark on a column that has a unique index of its own (a single column).
 
-**Import dialog**: opened by the toolbar's "Import SQL". The user pastes a PostgreSQL script or loads a `.sql` file (at most 2 MB), sees the Preview, and imports it. The text is parsed with the core's `importSql` each time it changes, and the schema that was previewed is the one imported.
+**Import dialog**: opened by the toolbar's "Import SQL". The user pastes a PostgreSQL script or loads a `.sql` file (at most 1 MB), sees the Preview, and imports it. The text is parsed with the core's `importSql` each time it changes, and the schema that was previewed is the one imported.
 
 **Preview**: what the Import dialog shows before anything changes: the counts of what the script has, the errors (each with its line; any error disables Import) and the skipped or changed statements (warnings, each with its line; at most 100 are listed).
 
