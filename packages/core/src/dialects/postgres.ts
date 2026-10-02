@@ -1,5 +1,11 @@
-import type { ColumnType } from '../schema/types.ts'
-import type { Dialect } from './dialect.ts'
+import type { Column, ColumnType, Table } from '../schema/types.ts'
+import type {
+  Dialect,
+  IndexContext,
+  TableContext,
+  TableParts,
+} from './dialect.ts'
+import { typeSql } from './type-sql.ts'
 
 function typeName(
   type: ColumnType,
@@ -77,8 +83,58 @@ function generatedImpliesNotNull(type: ColumnType): boolean {
   return type.kind === 'integer' || type.kind === 'bigint'
 }
 
+const present = (text: string | undefined): text is string =>
+  text !== undefined && text.trim() !== ''
+
+function requireColumn(table: Table, columnId: string): Column {
+  const found = table.columns.find((column) => column.id === columnId)
+  if (!found) {
+    throw new Error(`Unknown column "${columnId}" in table "${table.name}".`)
+  }
+  return found
+}
+
+function tableParts({ schema, table }: TableContext): TableParts {
+  const columns = table.columns.map((column) => {
+    // The script must say what the database will do: an identity column is
+    // NOT NULL whether or not the model says so.
+    const required =
+      !column.nullable ||
+      table.primaryKey.includes(column.id) ||
+      (column.generated === true && generatedImpliesNotNull(column.type))
+    const generated = column.generated ? generatedClause(column.type) : null
+    const fallback =
+      present(column.default) && !column.generated
+        ? ` DEFAULT ${column.default}`
+        : ''
+    return `  ${quoteIdentifier(column.name)} ${typeSql(schema, postgres, column.type)}${required ? ' NOT NULL' : ''}${fallback}${generated ? ` ${generated}` : ''}`
+  })
+  const keys =
+    table.primaryKey.length > 0
+      ? [
+          `  PRIMARY KEY (${table.primaryKey
+            .map((id) => quoteIdentifier(requireColumn(table, id).name))
+            .join(', ')})`,
+        ]
+      : []
+  return { columns, keys, checks: [] }
+}
+
+function createIndex({ table, index }: IndexContext): string {
+  const columns = index.columns.map((id) =>
+    quoteIdentifier(requireColumn(table, id).name)
+  )
+  const using = index.method === 'btree' ? '' : ` USING ${index.method}`
+  return `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${quoteIdentifier(index.name)} ON ${quoteIdentifier(table.name)}${using} (${columns.join(', ')});`
+}
+
 export const postgres: Dialect = {
   id: 'postgres',
+  supportsUserTypes: true,
+  constraintName: (kind, parts) => `${kind}_${parts.join('_')}`,
+  check: () => [],
+  tableParts,
+  createIndex,
   maxIdentifierBytes: 63,
   typeName,
   generatedClause,

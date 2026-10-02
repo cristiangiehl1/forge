@@ -1,4 +1,5 @@
-import type { Dialect } from '../../dialects/dialect.ts'
+import type { Dialect, DialectNote } from '../../dialects/dialect.ts'
+import { typeSql } from '../../dialects/type-sql.ts'
 import { userTypeIdsOf } from '../../schema/type-shape.ts'
 import type {
   Column,
@@ -38,19 +39,17 @@ export type DdlStatement =
   | { kind: 'comment'; key: string; tableId: string; sql: string }
 
 export type GenerateResult =
-  | { ok: true; sql: string; statements: DdlStatement[] }
+  | {
+      ok: true
+      sql: string
+      statements: DdlStatement[]
+      /** What the dialect adapted or could not translate; the script is still written. */
+      notes: DialectNote[]
+    }
   | { ok: false; issues: Issue[] }
 
 const present = (text: string | undefined): text is string =>
   text !== undefined && text.trim() !== ''
-
-/** The SQL name of a column type; user types are written by their quoted name. */
-function typeSql(schema: Schema, dialect: Dialect, type: ColumnType): string {
-  return dialect.typeName(type, (typeId) => {
-    const found = schema.types?.find((candidate) => candidate.id === typeId)
-    return dialect.quoteIdentifier(found?.name ?? typeId)
-  })
-}
 
 /** Enums first, then each domain after the types it is based on. */
 function orderTypes(types: UserType[]): UserType[] {
@@ -118,7 +117,7 @@ function foreignKeyOf(
   const toColumn = requireColumn(toTable, relationship.to.columnId)
   return {
     name: uniqueName(
-      `fk_${fromTable.name}_${fromColumn.name}`,
+      dialect.constraintName('fk', [fromTable.name, fromColumn.name]),
       usedNames,
       dialect.maxIdentifierBytes
     ),
@@ -127,50 +126,26 @@ function foreignKeyOf(
   }
 }
 
-function createIndex(table: Table, index: Index, dialect: Dialect): string {
-  const quote = (name: string) => dialect.quoteIdentifier(name)
-  const columns = index.columns.map((id) =>
-    quote(requireColumn(table, id).name)
-  )
-  const using = index.method === 'btree' ? '' : ` USING ${index.method}`
-  return `CREATE ${index.unique ? 'UNIQUE ' : ''}INDEX ${quote(index.name)} ON ${quote(table.name)}${using} (${columns.join(', ')});`
-}
-
 function createTable(
   schema: Schema,
   table: Table,
   inline: Relationship[],
   dialect: Dialect,
-  usedNames: Set<string>
+  usedNames: Set<string>,
+  notes: DialectNote[]
 ): string {
   const quote = (name: string) => dialect.quoteIdentifier(name)
-  const lines = table.columns.map((column) => {
-    // The script must say what the database will do: an identity column is
-    // NOT NULL whether or not the model says so.
-    const required =
-      !column.nullable ||
-      table.primaryKey.includes(column.id) ||
-      (column.generated === true &&
-        dialect.generatedImpliesNotNull(column.type))
-    const generated = column.generated
-      ? dialect.generatedClause(column.type)
-      : null
-    const fallback =
-      present(column.default) && !column.generated
-        ? ` DEFAULT ${column.default}`
-        : ''
-    return `  ${quote(column.name)} ${typeSql(schema, dialect, column.type)}${required ? ' NOT NULL' : ''}${fallback}${generated ? ` ${generated}` : ''}`
-  })
-  if (table.primaryKey.length > 0) {
-    const names = table.primaryKey.map((id) =>
-      quote(requireColumn(table, id).name)
-    )
-    lines.push(`  PRIMARY KEY (${names.join(', ')})`)
-  }
-  for (const relationship of inline) {
+  const parts = dialect.tableParts({ schema, table, notes, usedNames })
+  const foreignKeys = inline.map((relationship) => {
     const foreignKey = foreignKeyOf(schema, relationship, dialect, usedNames)
-    lines.push(`  CONSTRAINT ${quote(foreignKey.name)} ${foreignKey.clause}`)
-  }
+    return `  CONSTRAINT ${quote(foreignKey.name)} ${foreignKey.clause}`
+  })
+  const lines = [
+    ...parts.columns,
+    ...parts.keys,
+    ...foreignKeys,
+    ...parts.checks,
+  ]
   if (lines.length === 0) return `CREATE TABLE ${quote(table.name)} ();`
   return `CREATE TABLE ${quote(table.name)} (\n${lines.join(',\n')}\n);`
 }
@@ -240,25 +215,27 @@ function planTables(schema: Schema): {
 }
 
 export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
-  const issues = validate(schema)
+  const issues = [...validate(schema), ...dialect.check(schema)]
   if (issues.length > 0) return { ok: false, issues }
+
+  const notes: DialectNote[] = []
 
   const { planned, deferred } = planTables(schema)
   const usedNames = new Set<string>()
-  const statements: DdlStatement[] = orderTypes(schema.types ?? []).map(
-    (type) => ({
-      kind: 'type',
-      key: `type:${type.id}`,
-      typeId: type.id,
-      sql: createType(schema, type, dialect),
-    })
-  )
+  const statements: DdlStatement[] = dialect.supportsUserTypes
+    ? orderTypes(schema.types ?? []).map((type) => ({
+        kind: 'type' as const,
+        key: `type:${type.id}`,
+        typeId: type.id,
+        sql: createType(schema, type, dialect),
+      }))
+    : []
   for (const { table, inline } of planned) {
     statements.push({
       kind: 'create',
       key: `create:${table.id}`,
       tableId: table.id,
-      sql: createTable(schema, table, inline, dialect, usedNames),
+      sql: createTable(schema, table, inline, dialect, usedNames, notes),
     })
   }
   for (const relationship of deferred) {
@@ -273,12 +250,14 @@ export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
 
   for (const table of schema.tables) {
     for (const index of table.indexes ?? []) {
+      const sql = dialect.createIndex({ schema, table, index, notes })
+      if (sql === null) continue
       statements.push({
         kind: 'index',
         key: `index:${index.id}`,
         tableId: table.id,
         indexId: index.id,
-        sql: createIndex(table, index, dialect),
+        sql,
       })
     }
   }
@@ -310,5 +289,6 @@ export function generateDdl(schema: Schema, dialect: Dialect): GenerateResult {
         ? ''
         : `${statements.map((statement) => statement.sql).join('\n\n')}\n`,
     statements,
+    notes,
   }
 }

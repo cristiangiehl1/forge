@@ -1,4 +1,10 @@
-export type { Dialect } from './dialects/dialect.ts'
+export type {
+  Dialect,
+  DialectId,
+  DialectNote,
+  DialectOptions,
+} from './dialects/dialect.ts'
+export { DIALECT_IDS } from './dialects/dialect.ts'
 export { postgres } from './dialects/postgres.ts'
 export type { ParseError, ParseResult } from './project/parse-project.ts'
 export { parseProject } from './project/parse-project.ts'

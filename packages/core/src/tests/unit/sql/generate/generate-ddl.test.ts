@@ -17,6 +17,7 @@ describe('generateDdl', () => {
       ok: true,
       sql: '',
       statements: [],
+      notes: [],
     })
   })
 })
