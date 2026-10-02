@@ -18,6 +18,8 @@ import { createStore } from 'zustand/vanilla'
 
 import type { LoadResult } from '../../queries/project/load-project.ts'
 import { createShopExample } from '../example/shop-example.ts'
+import { mergeImported } from '../import/merge-schema.ts'
+import { placeAdded } from '../import/place-added.ts'
 import { layoutTables } from '../layout/layout-tables.ts'
 import type { NodePosition, ProjectView, Viewport } from '../project-view.ts'
 import {
@@ -61,6 +63,11 @@ export interface ForgeState {
   startNewProject: () => void
   /** Replaces the project with a ready-made example to look at. */
   loadExample: () => void
+  /**
+   * Puts an imported schema in the project: `replace` swaps the project for it,
+   * `add` appends it, renaming what collides. An empty project is always a replace.
+   */
+  importSchema: (imported: Schema, mode: 'replace' | 'add') => void
 
   addTable: () => TableId
   renameTable: (tableId: TableId, name: string) => void
@@ -209,6 +216,41 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
         persistence: 'ready',
         notice: null,
         projectEpoch: get().projectEpoch + 1,
+        fitRequest: get().fitRequest + 1,
+      })
+    },
+
+    importSchema: (imported, mode) => {
+      const { schema, view } = get()
+      const empty =
+        schema.tables.length === 0 && (schema.types ?? []).length === 0
+      if (mode === 'replace' || empty) {
+        set({
+          schema: imported,
+          view: { ...createView(), nodes: layoutTables(imported) },
+          selection: null,
+          relationshipSelection: null,
+          hoveredTable: null,
+          persistence: 'ready',
+          notice: null,
+          projectEpoch: get().projectEpoch + 1,
+          fitRequest: get().fitRequest + 1,
+        })
+        return
+      }
+      const merged = mergeImported(schema, imported)
+      const positions = placeAdded(
+        schema,
+        view,
+        merged.schema,
+        merged.addedTableIds
+      )
+      set({
+        schema: merged.schema,
+        view: { ...view, nodes: { ...view.nodes, ...positions } },
+        selection: null,
+        relationshipSelection: null,
+        hoveredTable: null,
         fitRequest: get().fitRequest + 1,
       })
     },

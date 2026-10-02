@@ -39,3 +39,11 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 **Types section**: what the Inspector shows when no table is selected: the enums and domains of the project, with add, edit and remove. A type that is used by a column shows "Used by: table.column" instead of a remove button.
 
 **UQ badge**: the mark on a column that has a unique index of its own (a single column).
+
+**Import dialog**: opened by the toolbar's "Import SQL". The user pastes a PostgreSQL script or loads a `.sql` file (at most 1 MB), sees the Preview, and imports it. The text is parsed with the core's `importSql` each time it changes, and the schema that was previewed is the one imported.
+
+**Preview**: what the Import dialog shows before anything changes: the counts of what the script has, the errors (each with its line; any error disables Import) and the skipped or changed statements (warnings, each with its line; at most 100 are listed).
+
+**Add**: the Import dialog's default when the project has tables. It appends the imported tables, renaming a table, index or type whose name is taken (`users_2`, `users_3`…), and places only the new tables, to the right of the existing ones. The viewport and the user's positions are left alone.
+
+**Replace**: the Import dialog's other mode. It swaps the whole project for the script and lays the tables out by their relationships; it asks for a second click, like Load example.

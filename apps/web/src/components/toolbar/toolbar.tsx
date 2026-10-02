@@ -1,7 +1,10 @@
+import { useState } from 'react'
+
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
 import type { NewTableId } from '../../lib/settings/settings.ts'
 import { NEW_TABLE_ID_CHOICES } from '../../lib/settings/settings.ts'
 import { ConfirmButton } from '../confirm-button.tsx'
+import { ImportDialog } from '../import/import-dialog.tsx'
 
 interface ToolbarProps {
   ddlOpen: boolean
@@ -15,6 +18,7 @@ const NEW_TABLE_ID_LABELS: Record<NewTableId, string> = {
 }
 
 export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
+  const [importing, setImporting] = useState(false)
   const newTableId = useForgeStore((state) => state.settings.newTableId)
   const newTableTimestamps = useForgeStore(
     (state) => state.settings.newTableTimestamps
@@ -72,6 +76,10 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
         onClick={() => forgeStore.getState().autoLayout()}>
         Auto-arrange
       </button>
+      <button type='button' onClick={() => setImporting(true)}>
+        Import SQL
+      </button>
+      {importing && <ImportDialog onClose={() => setImporting(false)} />}
       <button type='button' aria-pressed={ddlOpen} onClick={onToggleDdl}>
         {ddlOpen ? 'Hide DDL' : 'Show DDL'}
       </button>

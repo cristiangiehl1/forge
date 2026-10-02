@@ -438,3 +438,57 @@ button {
   gap: 8px;
   margin-top: 12px;
 }
+.import-dialog {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 16px;
+  overflow: auto;
+  color: var(--text);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.import-dialog::backdrop {
+  background: rgb(0 0 0 / 40%);
+}
+
+.import-dialog__title {
+  margin: 0 0 8px;
+  font-size: 16px;
+}
+
+.import-dialog__text {
+  box-sizing: border-box;
+  width: 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.import-dialog__preview {
+  margin: 12px 0;
+}
+
+.import-dialog__list {
+  max-height: 180px;
+  margin: 4px 0;
+  padding-left: 18px;
+  overflow: auto;
+  font-size: 12px;
+}
+
+.import-dialog__error {
+  color: var(--error-text);
+}
+
+.import-dialog__mode {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 12px;
+}
+
+.import-dialog__actions {
+  display: flex;
+  gap: 8px;
+}
