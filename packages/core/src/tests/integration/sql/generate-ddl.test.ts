@@ -275,10 +275,37 @@ describe('generateDdl with generated columns', () => {
   const generated = (
     id: string,
     name: string,
-    kind: 'integer' | 'bigint' | 'uuid'
+    kind: 'integer' | 'bigint' | 'uuid' | 'timestamp'
   ) => ({
     ...column(id, name, { kind }, false),
     generated: true,
+  })
+
+  it('gives a generated timestamp DEFAULT now(), and it stays nullable unless marked', () => {
+    const schema = schemaOf([
+      table(
+        't',
+        'users',
+        [
+          column('c1', 'id', { kind: 'integer' }, false),
+          {
+            ...generated('c2', 'created_at', 'timestamp'),
+            nullable: false,
+          },
+        ],
+        ['c1']
+      ),
+    ])
+    assert.equal(
+      sqlOf(schema),
+      lines(
+        'CREATE TABLE "users" (',
+        '  "id" integer NOT NULL,',
+        '  "created_at" timestamptz NOT NULL DEFAULT now(),',
+        '  PRIMARY KEY ("id")',
+        ');'
+      )
+    )
   })
 
   it('declares a generated integer id as an identity column', () => {

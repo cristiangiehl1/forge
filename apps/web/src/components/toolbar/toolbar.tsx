@@ -16,6 +16,9 @@ const NEW_TABLE_ID_LABELS: Record<NewTableId, string> = {
 
 export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
   const newTableId = useForgeStore((state) => state.settings.newTableId)
+  const newTableTimestamps = useForgeStore(
+    (state) => state.settings.newTableTimestamps
+  )
   const hasTables = useForgeStore((state) => state.schema.tables.length > 0)
 
   return (
@@ -39,6 +42,16 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
             </option>
           ))}
         </select>
+      </label>
+      <label className='toolbar__field'>
+        <input
+          type='checkbox'
+          checked={newTableTimestamps}
+          onChange={(event) =>
+            forgeStore.getState().setNewTableTimestamps(event.target.checked)
+          }
+        />
+        created_at / updated_at on new tables
       </label>
       {hasTables ? (
         <ConfirmButton

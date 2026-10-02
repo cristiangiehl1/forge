@@ -19,8 +19,11 @@ describe('loadSettings', () => {
 
   it('returns what saveSettings stored', () => {
     const storage = memoryStorage()
-    saveSettings(storage, { newTableId: 'uuid' })
-    assert.deepEqual(loadSettings(storage), { newTableId: 'uuid' })
+    saveSettings(storage, { ...DEFAULT_SETTINGS, newTableId: 'uuid' })
+    assert.deepEqual(loadSettings(storage), {
+      ...DEFAULT_SETTINGS,
+      newTableId: 'uuid',
+    })
   })
 
   it('returns the default for text that is not JSON', () => {
@@ -45,18 +48,25 @@ describe('loadSettings', () => {
 describe('saveSettings', () => {
   it('writes the settings as JSON', () => {
     const storage = memoryStorage()
-    saveSettings(storage, { newTableId: 'none' })
-    assert.equal(storage.peek(), '{"newTableId":"none"}')
+    saveSettings(storage, { ...DEFAULT_SETTINGS, newTableId: 'none' })
+    assert.equal(
+      storage.peek(),
+      '{"newTableId":"none","newTableTimestamps":false}'
+    )
   })
 
   it('does not throw when the write fails', () => {
     assert.doesNotThrow(() =>
       saveSettings(quotaStorage(null, 'QuotaExceededError'), {
+        ...DEFAULT_SETTINGS,
         newTableId: 'uuid',
       })
     )
     assert.doesNotThrow(() =>
-      saveSettings(brokenStorage('SecurityError'), { newTableId: 'uuid' })
+      saveSettings(brokenStorage('SecurityError'), {
+        ...DEFAULT_SETTINGS,
+        newTableId: 'uuid',
+      })
     )
   })
 })

@@ -61,6 +61,14 @@ describe('createShopExample', () => {
     assert.equal(new Set(ids).size, ids.length)
   })
 
+  it('gives every created_at column DEFAULT now(), as the timestamps preference does', () => {
+    const created = schema.tables.flatMap((table) =>
+      table.columns.filter((column) => column.name === 'created_at')
+    )
+    assert.ok(created.length > 0)
+    for (const column of created) assert.equal(column.generated, true)
+  })
+
   it('shows what the app can do: generated ids, a composite key, several types', () => {
     const columns = schema.tables.flatMap((table) => table.columns)
     assert.ok(

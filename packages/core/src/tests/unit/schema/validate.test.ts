@@ -251,8 +251,8 @@ describe('validate: generated columns', () => {
       ]),
     ])
 
-  it('accepts a generated integer, bigint or uuid column', () => {
-    for (const kind of ['integer', 'bigint', 'uuid'] as const) {
+  it('accepts a generated integer, bigint, uuid or timestamp column', () => {
+    for (const kind of ['integer', 'bigint', 'uuid', 'timestamp'] as const) {
       assert.deepEqual(validate(withColumn({ kind }, true)), [])
     }
   })
@@ -266,6 +266,7 @@ describe('validate: generated columns', () => {
     for (const type of [
       { kind: 'text' },
       { kind: 'boolean' },
+      { kind: 'date' },
       { kind: 'varchar', length: 10 },
       { kind: 'numeric', precision: 5, scale: 2 },
     ] as ColumnType[]) {

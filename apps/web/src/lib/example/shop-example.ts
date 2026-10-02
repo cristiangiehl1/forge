@@ -40,6 +40,15 @@ const id = (): ColumnDef => ({
   primaryKey: true,
 })
 
+/** What the timestamps preference gives a new table: DEFAULT now(), required. */
+const timestamps = (): ColumnDef[] =>
+  ['created_at', 'updated_at'].map((name) => ({
+    name,
+    type: { kind: 'timestamp' },
+    notNull: true,
+    generated: true,
+  }))
+
 const TABLES: TableDef[] = [
   {
     name: 'users',
@@ -47,7 +56,7 @@ const TABLES: TableDef[] = [
       id(),
       { name: 'name', type: varchar(120), notNull: true },
       { name: 'email', type: varchar(255), notNull: true },
-      { name: 'created_at', type: { kind: 'timestamp' }, notNull: true },
+      ...timestamps(),
     ],
   },
   {
@@ -72,7 +81,7 @@ const TABLES: TableDef[] = [
       { name: 'address_id', type: integer },
       { name: 'status', type: varchar(20), notNull: true },
       { name: 'total', type: money(12) },
-      { name: 'created_at', type: { kind: 'timestamp' }, notNull: true },
+      ...timestamps(),
     ],
   },
   {

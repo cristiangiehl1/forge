@@ -24,6 +24,8 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 
 **New-table id preference**: the app setting "New tables start with": `integer` (a generated integer `id`, the default), `uuid` (a generated uuid `id`) or `none`. It only affects tables created afterwards, belongs to the app and not to a project, and is kept under its own storage key.
 
+**New-table timestamps preference**: the app setting "created_at / updated_at on new tables" (off by default). When on, a new table also gets two generated, required `timestamp` columns, `created_at` and `updated_at`, which the DDL writes as `timestamptz NOT NULL DEFAULT now()`. `updated_at` is only filled on insert: refreshing it on update would need a trigger, which Forge does not model. It is stored with the other app settings, each field falling back on its own.
+
 **Node geometry**: the fixed size of a table node (220 px wide, a 31 px title, 26 px per column row, 1 px border), pinned in both `lib/geometry.ts` and the CSS. Layout and routing rely on it to know where every table and connection point is without measuring the page.
 
 **Layout**: `layoutTables` places tables in layers by their relationships: a table referenced by another sits to its left, siblings are ordered to keep lines short, and unrelated tables go to the side. The toolbar's "Auto-arrange" applies it; the example is laid out with it.

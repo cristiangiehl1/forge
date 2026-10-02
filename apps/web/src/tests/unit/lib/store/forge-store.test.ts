@@ -1,7 +1,13 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { addTable, createProject, createSchema } from '@forge/core'
+import {
+  addTable,
+  createProject,
+  createSchema,
+  generateDdl,
+  postgres,
+} from '@forge/core'
 
 import { createView, nextNodePosition } from '../../../../lib/project-view.ts'
 import { createForgeStore } from '../../../../lib/store/forge-store.ts'
@@ -411,10 +417,73 @@ describe('relationship selection', () => {
   })
 })
 
+describe('the timestamp columns of a new table', () => {
+  const columnsOf = (store: ReturnType<typeof makeDefaultStore>) =>
+    store.getState().schema.tables[0]?.columns ?? []
+
+  it('are not created by default', () => {
+    const store = makeDefaultStore()
+    store.getState().addTable()
+    assert.deepEqual(
+      columnsOf(store).map((column) => column.name),
+      ['id']
+    )
+  })
+
+  it('are created_at and updated_at, generated and required, after the id, once chosen', () => {
+    const store = makeDefaultStore()
+    store.getState().setNewTableTimestamps(true)
+    store.getState().addTable()
+    const columns = columnsOf(store)
+    assert.deepEqual(
+      columns.map((column) => column.name),
+      ['id', 'created_at', 'updated_at']
+    )
+    for (const column of columns.slice(1)) {
+      assert.deepEqual(column.type, { kind: 'timestamp' })
+      assert.equal(column.generated, true)
+      assert.equal(column.nullable, false)
+    }
+    assert.deepEqual(store.getState().schema.tables[0]?.primaryKey, [
+      columns[0]?.id,
+    ])
+  })
+
+  it('are created even when the table has no id column', () => {
+    const store = makeDefaultStore()
+    store.getState().setNewTableId('none')
+    store.getState().setNewTableTimestamps(true)
+    store.getState().addTable()
+    assert.deepEqual(
+      columnsOf(store).map((column) => column.name),
+      ['created_at', 'updated_at']
+    )
+  })
+
+  it('give a DDL with DEFAULT now() and a valid schema', () => {
+    const store = makeDefaultStore()
+    store.getState().setNewTableTimestamps(true)
+    store.getState().addTable()
+    const result = generateDdl(store.getState().schema, postgres)
+    assert.equal(result.ok, true)
+    if (result.ok) {
+      assert.match(
+        result.sql,
+        /"created_at" timestamptz NOT NULL DEFAULT now\(\)/
+      )
+      assert.match(
+        result.sql,
+        /"updated_at" timestamptz NOT NULL DEFAULT now\(\)/
+      )
+    }
+  })
+})
+
 describe('the id column of a new table', () => {
   it('starts with the default settings', () => {
     assert.deepEqual(makeDefaultStore().getState().settings, {
       newTableId: 'integer',
+      newTableTimestamps: false,
     })
   })
 
@@ -483,8 +552,9 @@ describe('the id column of a new table', () => {
 
   it('hydrateSettings replaces the settings', () => {
     const store = makeDefaultStore()
-    store.getState().hydrateSettings({ newTableId: 'uuid' })
-    assert.deepEqual(store.getState().settings, { newTableId: 'uuid' })
+    const settings = { newTableId: 'uuid', newTableTimestamps: true } as const
+    store.getState().hydrateSettings(settings)
+    assert.deepEqual(store.getState().settings, settings)
   })
 
   it('startNewProject keeps the settings: they belong to the app, not the project', () => {

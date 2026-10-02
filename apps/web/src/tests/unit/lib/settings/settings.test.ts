@@ -7,15 +7,21 @@ import {
 } from '../../../../lib/settings/settings.ts'
 
 describe('DEFAULT_SETTINGS', () => {
-  it('starts new tables with an integer id', () => {
-    assert.deepEqual(DEFAULT_SETTINGS, { newTableId: 'integer' })
+  it('starts new tables with an integer id and no timestamp columns', () => {
+    assert.deepEqual(DEFAULT_SETTINGS, {
+      newTableId: 'integer',
+      newTableTimestamps: false,
+    })
   })
 })
 
 describe('parseSettings', () => {
   it('reads each of the three choices', () => {
     for (const newTableId of ['integer', 'uuid', 'none']) {
-      assert.deepEqual(parseSettings({ newTableId }), { newTableId })
+      assert.deepEqual(parseSettings({ newTableId }), {
+        ...DEFAULT_SETTINGS,
+        newTableId,
+      })
     }
   })
 
@@ -37,7 +43,26 @@ describe('parseSettings', () => {
 
   it('ignores fields it does not know', () => {
     assert.deepEqual(parseSettings({ newTableId: 'uuid', theme: 'dark' }), {
+      ...DEFAULT_SETTINGS,
       newTableId: 'uuid',
     })
+  })
+
+  it('reads the timestamps preference on its own, and a saved id choice without it keeps working', () => {
+    assert.deepEqual(parseSettings({ newTableTimestamps: true }), {
+      ...DEFAULT_SETTINGS,
+      newTableTimestamps: true,
+    })
+    assert.deepEqual(parseSettings({ newTableId: 'uuid' }), {
+      newTableId: 'uuid',
+      newTableTimestamps: false,
+    })
+  })
+
+  it('ignores a timestamps preference that is not a boolean, keeping a valid id choice', () => {
+    assert.deepEqual(
+      parseSettings({ newTableId: 'none', newTableTimestamps: 'yes' }),
+      { newTableId: 'none', newTableTimestamps: false }
+    )
   })
 })

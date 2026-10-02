@@ -41,7 +41,7 @@ describe('connectSettings', () => {
     const store = makeStore()
     connectSettings(store, storage)
     store.getState().setNewTableId('none')
-    assert.equal(peek(), '{"newTableId":"none"}')
+    assert.equal(peek(), '{"newTableId":"none","newTableTimestamps":false}')
   })
 
   it('does not save when something else in the store changes', () => {

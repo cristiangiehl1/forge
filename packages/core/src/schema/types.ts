@@ -25,8 +25,13 @@ export type ColumnType =
   | { kind: 'varchar'; length: number }
   | { kind: 'numeric'; precision: number; scale: number }
 
-/** The kinds a database can generate a value for: identity or a default. */
-export const GENERATED_COLUMN_KINDS = ['integer', 'bigint', 'uuid'] as const
+/** The kinds a database can generate a value for: identity or a default (a timestamp defaults to now()). */
+export const GENERATED_COLUMN_KINDS = [
+  'integer',
+  'bigint',
+  'uuid',
+  'timestamp',
+] as const
 
 export interface Column {
   id: ColumnId

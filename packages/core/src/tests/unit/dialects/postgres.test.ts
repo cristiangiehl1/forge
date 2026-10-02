@@ -70,6 +70,13 @@ describe('postgres.generatedClause', () => {
     )
   })
 
+  it('uses now() as the default of a timestamp, which is timestamptz', () => {
+    assert.equal(
+      postgres.generatedClause({ kind: 'timestamp' }),
+      'DEFAULT now()'
+    )
+  })
+
   it('has nothing to generate for the other types', () => {
     assert.equal(postgres.generatedClause({ kind: 'text' }), null)
     assert.equal(postgres.generatedClause({ kind: 'varchar', length: 5 }), null)
@@ -84,6 +91,7 @@ describe('postgres.generatedImpliesNotNull', () => {
 
   it('is false for a uuid default and for types that cannot be generated', () => {
     assert.equal(postgres.generatedImpliesNotNull({ kind: 'uuid' }), false)
+    assert.equal(postgres.generatedImpliesNotNull({ kind: 'timestamp' }), false)
     assert.equal(postgres.generatedImpliesNotNull({ kind: 'text' }), false)
   })
 })

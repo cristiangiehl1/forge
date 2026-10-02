@@ -179,7 +179,7 @@ export function validate(schema: Schema): Issue[] {
         issues.push(
           issue(
             'generated-unsupported-type',
-            `Column "${table.name}.${column.name}" cannot be generated: only integer, bigint and uuid columns can.`,
+            `Column "${table.name}.${column.name}" cannot be generated: only integer, bigint, uuid and timestamp columns can.`,
             ids
           )
         )

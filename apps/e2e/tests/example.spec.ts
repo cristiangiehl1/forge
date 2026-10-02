@@ -40,7 +40,10 @@ test.describe('the example project', () => {
     await page.getByRole('button', { name: 'Load example' }).click()
 
     await expect(
-      editor.node('users').locator('.table-node__badge', { hasText: 'auto' })
+      editor
+        .node('users')
+        .locator('.table-node__badge', { hasText: 'auto' })
+        .first()
     ).toBeVisible()
     await expect(
       editor

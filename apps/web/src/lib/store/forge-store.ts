@@ -52,6 +52,7 @@ export interface ForgeState {
   hydrate: (result: LoadResult) => void
   hydrateSettings: (settings: AppSettings) => void
   setNewTableId: (newTableId: NewTableId) => void
+  setNewTableTimestamps: (enabled: boolean) => void
   startNewProject: () => void
   /** Replaces the project with a ready-made example to look at. */
   loadExample: () => void
@@ -120,6 +121,8 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
 
     setNewTableId: (newTableId) =>
       set({ settings: { ...get().settings, newTableId } }),
+    setNewTableTimestamps: (newTableTimestamps) =>
+      set({ settings: { ...get().settings, newTableTimestamps } }),
 
     hydrate: (result) => {
       switch (result.status) {
@@ -208,6 +211,17 @@ export function createForgeStore({ newId }: ForgeStoreDeps) {
           generated: true,
         })
         next = core.setPrimaryKey(next, id, [columnId])
+      }
+      if (settings.newTableTimestamps) {
+        for (const columnName of ['created_at', 'updated_at']) {
+          next = core.addColumn(next, id, {
+            id: newId(),
+            name: columnName,
+            type: { kind: 'timestamp' },
+            nullable: false,
+            generated: true,
+          })
+        }
       }
       set({
         schema: next,

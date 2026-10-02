@@ -24,4 +24,4 @@ The vocabulary of the domain model. Nothing here knows about the canvas.
 
 **View**: the opaque slot of a Project that the web fills with node positions and the viewport. To the core it is just JSON to carry along.
 
-**Generated column**: a Column whose value the database produces: an identity for an `integer` or `bigint`, a default (`gen_random_uuid()`) for a `uuid`. It is a flag on the Column (`generated`), allowed only on those three types, and absent means false. Avoid "auto-increment" and "serial" in code and in the model; the toolbar says "auto-increment" to the user, because that is the familiar word.
+**Generated column**: a Column whose value the database produces: an identity for an `integer` or `bigint`, a default (`gen_random_uuid()`) for a `uuid`, `DEFAULT now()` for a `timestamp` (stored as `timestamptz`, so in UTC). It is a flag on the Column (`generated`), allowed only on those four types, and absent means false. Avoid "auto-increment" and "serial" in code and in the model; the toolbar says "auto-increment" to the user, because that is the familiar word.
