@@ -36,6 +36,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     (state) =>
       state.schema.tables.length > 0 || (state.schema.types ?? []).length > 0
   )
+  const dialect = useForgeStore((state) => state.dialect)
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<Parsed | null>(null)
   // The preview lags the text by the debounce; Import waits for it to catch up.
@@ -127,6 +128,12 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
         and foreign keys, indexes, comments, enums and domains are imported;
         anything else is listed below and skipped.
       </p>
+
+      {dialect !== 'postgres' && (
+        <p className='inspector__hint'>
+          Scripts are read as PostgreSQL, whatever dialect the project uses.
+        </p>
+      )}
 
       <label className='field'>
         SQL

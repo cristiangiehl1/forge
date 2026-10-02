@@ -1,3 +1,5 @@
+import type { DialectId } from '@forge/core'
+import { DIALECT_IDS } from '@forge/core'
 import { useState } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
@@ -12,6 +14,11 @@ interface ToolbarProps {
   onToggleDdl: () => void
 }
 
+const DIALECT_LABELS: Record<DialectId, string> = {
+  postgres: 'PostgreSQL',
+  oracle: 'Oracle',
+}
+
 const NEW_TABLE_ID_LABELS: Record<NewTableId, string> = {
   integer: 'id: integer (auto-increment)',
   uuid: 'id: uuid (generated)',
@@ -20,6 +27,8 @@ const NEW_TABLE_ID_LABELS: Record<NewTableId, string> = {
 
 export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
   const [importing, setImporting] = useState(false)
+  const dialect = useForgeStore((state) => state.dialect)
+  const dialectOptions = useForgeStore((state) => state.dialectOptions)
   const undoable = useForgeStore((state) => canUndo(state.history))
   const redoable = useForgeStore((state) => canRedo(state.history))
   const newTableId = useForgeStore((state) => state.settings.newTableId)
@@ -74,6 +83,38 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
         />
         created_at / updated_at on new tables
       </label>
+      <label className='toolbar__field'>
+        Dialect
+        <select
+          aria-label='Dialect'
+          value={dialect}
+          onChange={(event) =>
+            forgeStore.getState().setDialect(event.target.value as DialectId)
+          }>
+          {DIALECT_IDS.map((id) => (
+            <option key={id} value={id}>
+              {DIALECT_LABELS[id]}
+            </option>
+          ))}
+        </select>
+      </label>
+      {dialect === 'oracle' && (
+        <label className='toolbar__field'>
+          uuid as
+          <select
+            aria-label='Oracle uuid'
+            value={dialectOptions.uuid ?? 'raw16'}
+            onChange={(event) =>
+              forgeStore.getState().setDialectOptions({
+                ...dialectOptions,
+                uuid: event.target.value as 'raw16' | 'varchar36',
+              })
+            }>
+            <option value='raw16'>RAW(16)</option>
+            <option value='varchar36'>VARCHAR2(36)</option>
+          </select>
+        </label>
+      )}
       {hasTables ? (
         <ConfirmButton
           label='Load example'

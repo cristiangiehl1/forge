@@ -2,6 +2,8 @@ import type {
   Column,
   ColumnId,
   ColumnRef,
+  DialectId,
+  DialectOptions,
   Index,
   IndexId,
   Issue,
@@ -49,6 +51,9 @@ export interface ForgeState {
   relationshipSelection: RelationshipId | null
   /** The table the pointer is over: it is highlighted, and so is its part of the script. */
   hoveredTable: TableId | null
+  /** The database the DDL is written for; saved with the project, not an undo step. */
+  dialect: DialectId
+  dialectOptions: DialectOptions
   /** The steps that can be undone and redone; in memory only. */
   history: History
   /** Moves on when a layout was applied and the canvas should zoom to fit it. */
@@ -65,6 +70,8 @@ export interface ForgeState {
   hydrateSettings: (settings: AppSettings) => void
   setNewTableId: (newTableId: NewTableId) => void
   setNewTableTimestamps: (enabled: boolean) => void
+  setDialect: (dialect: DialectId) => void
+  setDialectOptions: (options: DialectOptions) => void
   startNewProject: () => void
   /** Replaces the project with a ready-made example to look at. */
   loadExample: () => void
@@ -132,6 +139,8 @@ const emptyProject = () => ({
   relationshipSelection: null,
   hoveredTable: null,
   history: emptyHistory(),
+  dialect: 'postgres' as DialectId,
+  dialectOptions: {} as DialectOptions,
 })
 
 /** A relationship selection survives only while that relationship exists. */
@@ -247,6 +256,8 @@ export function createForgeStore({ newId, now = Date.now }: ForgeStoreDeps) {
 
       setNewTableId: (newTableId) =>
         set({ settings: { ...get().settings, newTableId } }),
+      setDialect: (dialect) => set({ dialect }),
+      setDialectOptions: (dialectOptions) => set({ dialectOptions }),
       setNewTableTimestamps: (newTableTimestamps) =>
         set({ settings: { ...get().settings, newTableTimestamps } }),
 
@@ -262,6 +273,8 @@ export function createForgeStore({ newId, now = Date.now }: ForgeStoreDeps) {
               selection: null,
               relationshipSelection: null,
               hoveredTable: null,
+              dialect: result.project.dialect ?? 'postgres',
+              dialectOptions: result.project.options ?? {},
               hydrated: true,
               persistence: 'ready',
               notice: null,

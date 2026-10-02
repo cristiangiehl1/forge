@@ -17,23 +17,34 @@ export function useAutosave(): string | null {
   const schema = useForgeStore((state) => state.schema)
   const view = useForgeStore((state) => state.view)
   const persistence = useForgeStore((state) => state.persistence)
+  const dialect = useForgeStore((state) => state.dialect)
+  const dialectOptions = useForgeStore((state) => state.dialectOptions)
   const { mutate, isError, error } = useSaveProject()
 
   useEffect(() => {
     if (persistence !== 'ready') return
     const timer = setTimeout(
-      () => mutate(createProject(schema, view)),
+      () =>
+        mutate(
+          createProject(schema, view, { dialect, options: dialectOptions })
+        ),
       AUTOSAVE_DELAY_MS
     )
     return () => clearTimeout(timer)
-  }, [schema, view, persistence, mutate])
+  }, [schema, view, persistence, dialect, dialectOptions, mutate])
 
   // A change made in the last half second would otherwise be lost on close.
   useEffect(() => {
     function flush() {
       const state = forgeStore.getState()
       if (state.persistence !== 'ready') return
-      saveProject(localStorageProject, createProject(state.schema, state.view))
+      saveProject(
+        localStorageProject,
+        createProject(state.schema, state.view, {
+          dialect: state.dialect,
+          options: state.dialectOptions,
+        })
+      )
     }
     window.addEventListener('pagehide', flush)
     return () => window.removeEventListener('pagehide', flush)

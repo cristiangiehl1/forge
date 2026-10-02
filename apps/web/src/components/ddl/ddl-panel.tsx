@@ -1,4 +1,4 @@
-import { generateDdl, postgres } from '@forge/core'
+import { generateDdl, getDialect } from '@forge/core'
 import { useEffect, useRef, useState } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
@@ -10,12 +10,14 @@ export function DdlPanel() {
   const schema = useForgeStore((state) => state.schema)
   const [copyState, setCopyState] = useState<CopyState>('idle')
   const hoveredTable = useForgeStore((state) => state.hoveredTable)
+  const dialect = useForgeStore((state) => state.dialect)
+  const dialectOptions = useForgeStore((state) => state.dialectOptions)
   const activeRef = useRef<HTMLSpanElement | null>(null)
   // True while the pointer is over a statement: the hover then comes from the
   // panel itself, and scrolling it to a statement would move what is under the
   // pointer.
   const pointerInPanel = useRef(false)
-  const result = generateDdl(schema, postgres)
+  const result = generateDdl(schema, getDialect(dialect, dialectOptions))
 
   // Bring the hovered table's statement into view; the panel scrolls, not the page.
   useEffect(() => {
@@ -66,6 +68,18 @@ export function DdlPanel() {
           <button type='button' onClick={() => saveFile(sqlFile(result.sql))}>
             Download .sql
           </button>
+          {result.notes.length > 0 && (
+            <>
+              <h3 className='ddl-panel__notes-title'>
+                Compatibility notes ({result.notes.length})
+              </h3>
+              <ul aria-label='Compatibility notes' className='ddl-panel__notes'>
+                {result.notes.map((note) => (
+                  <li key={`${note.code}:${note.message}`}>{note.message}</li>
+                ))}
+              </ul>
+            </>
+          )}
           <pre>
             <code>
               {result.statements.map((statement, index) => {
