@@ -201,6 +201,25 @@ button {
   border: 1px solid var(--border);
 }
 
+.type-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.type-row textarea {
+  flex: 1 0 100%;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.type-row__kind {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .column-row__extra {
   display: flex;
   flex: 1 0 100%;

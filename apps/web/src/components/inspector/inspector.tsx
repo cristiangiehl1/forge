@@ -24,6 +24,7 @@ import { relationshipsOf } from '../../lib/relationships.ts'
 import { ConfirmButton } from '../confirm-button.tsx'
 import { IndexList } from './index-list.tsx'
 import { NumberField } from './number-field.tsx'
+import { TypesPanel } from './types-panel.tsx'
 
 function ColumnRow({ table, column }: { table: Table; column: Column }) {
   const { updateColumn, removeColumn, setPrimaryKey } = forgeStore.getState()
@@ -227,6 +228,7 @@ export function Inspector() {
           Select a table to edit it, or add a new one from the toolbar. To look
           around first, load the example project.
         </p>
+        <TypesPanel />
       </aside>
     )
   }
