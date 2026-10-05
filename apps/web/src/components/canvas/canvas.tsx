@@ -114,6 +114,8 @@ export function Canvas() {
       edges={edges}
       nodeTypes={nodeTypes}
       edgeTypes={edgeTypes}
+      // The default floor of 0.5 is too high for a project of fifty tables.
+      minZoom={0.05}
       connectionMode={ConnectionMode.Loose}
       onNodesChange={(changes: NodeChange<TableFlowNode>[]) =>
         forwardNodeChanges(changes, canvasActions)
