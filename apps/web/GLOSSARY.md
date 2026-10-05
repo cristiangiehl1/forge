@@ -56,6 +56,10 @@ The vocabulary of the canvas and the UI. The domain terms (Schema, Table, Column
 
 **Download .sql**: the DDL panel's button next to Copy. It saves the very script the panel shows, as `forge-schema.sql` (UTF-8), through a temporary link released at once. It is not shown when the project is empty or when the schema has problems, like Copy.
 
-**Dialect selector**: the toolbar's choice of PostgreSQL or Oracle (and, for Oracle, how a uuid is stored). It is saved with the project, changes the DDL at once, and is not an undo step. Importing SQL still reads PostgreSQL, and the dialog says so under Oracle.
+**Dialect selector**: the toolbar's choice of PostgreSQL or Oracle (and, for Oracle, how a uuid is stored). It is saved with the project, changes the DDL at once, and is not an undo step. Importing SQL is read as the project's dialect by default (see Read as).
 
 **Compatibility notes**: the list under the DDL panel's buttons: what the chosen dialect adapted or copied as written, each citing its table or column.
+
+**Read as**: the Import dialog's choice of the script's database, PostgreSQL or Oracle. It starts at the project's dialect and re-reads the text when changed.
+
+**Recruitment example**: the second example: the recruitment system's Oracle migrations, read by the importer. Loading it makes the project Oracle and asks for a second click when the project has tables.

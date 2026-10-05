@@ -16,7 +16,7 @@ The vocabulary of the domain model. Nothing here knows about the canvas.
 
 **Issue**: one reason a Schema is not valid yet, with a code, a message and the ids it concerns. `validate` returns a list of them; an empty list means valid. A draft with Issues can still be saved.
 
-**Dialect**: how one database writes SQL: how a column type is spelled, how an identifier is quoted, and how long an identifier may be. Only PostgreSQL exists.
+**Dialect**: how one database writes SQL: how a column type is spelled, how an identifier is quoted, and how long an identifier may be. PostgreSQL and Oracle exist.
 
 **DDL** (Data Definition Language): the part of SQL that defines structure (`CREATE TABLE`, `ALTER TABLE`), as opposed to the part that handles data (`SELECT`, `INSERT`). "Generating DDL" turns a Schema into a script that creates it.
 
@@ -41,3 +41,9 @@ The vocabulary of the domain model. Nothing here knows about the canvas.
 **Compatibility note**: something a dialect adapted or could not translate (an array stored as JSON, an index that is not created, a default copied as written). The script is still written; each note cites its table, column or index.
 
 **Dialect issue**: what makes the schema impossible in a dialect (a key over a `CLOB`/`BLOB`, names that collide once upper-cased, a name that is too long). It blocks the script, like any issue.
+
+**Number**: a number with no precision, the logical type `number`: `NUMBER` in Oracle, `numeric` in PostgreSQL. It may be generated (an identity).
+
+**Native type**: a column type the model has no logical type for, kept as its database writes it, with that database (`{ kind: 'native', dialect, text }`). In another database it is written as a safe type, with a note.
+
+**Type reader**: the per-database module that turns the SQL spelling of a type into a model type; the writer is the dialect's `typeName`. `importSql` takes the dialect of the script, which also decides how a plain name is folded (lower case for PostgreSQL, upper case for Oracle).
