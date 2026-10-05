@@ -60,6 +60,11 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
             {kindLabel(kind)}
           </option>
         ))}
+        {base.kind === 'native' && (
+          <option value='native' disabled>
+            native: {base.text}
+          </option>
+        )}
         {userTypes.length > 0 && (
           <optgroup label='Custom types'>
             {userTypes.map((type) => (
@@ -100,6 +105,21 @@ function ColumnRow({ table, column }: { table: Table; column: Column }) {
                 current.kind === 'char'
                   ? { kind: 'char', length }
                   : setVarcharLength(current, length)
+              ),
+            })
+          }
+        />
+      )}
+      {base.kind === 'native' && (
+        <input
+          aria-label='Native type'
+          value={base.text}
+          onChange={(event) =>
+            updateColumn(table.id, column.id, {
+              type: mapBase(column.type, (current) =>
+                current.kind === 'native'
+                  ? { ...current, text: event.target.value }
+                  : current
               ),
             })
           }

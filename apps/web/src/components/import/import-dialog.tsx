@@ -1,5 +1,5 @@
-import type { ImportResult } from '@forge/core'
-import { importSql } from '@forge/core'
+import type { DialectId, ImportResult } from '@forge/core'
+import { DIALECT_IDS, importSql } from '@forge/core'
 import { useEffect, useRef, useState } from 'react'
 
 import { forgeStore, useForgeStore } from '../../hooks/use-forge-store.ts'
@@ -17,14 +17,24 @@ const MAX_LISTED = 100
 
 type Mode = 'add' | 'replace'
 
+interface ToParse {
+  text: string
+  readAs: DialectId
+}
+
 interface Parsed {
   text: string
   result: ImportResult
 }
 
-function parse(text: string): Parsed | null {
+function parse(text: string, readAs: DialectId): Parsed | null {
   if (text.trim() === '') return null
-  return { text, result: importSql(text, () => crypto.randomUUID()) }
+  return { text, result: importSql(text, () => crypto.randomUUID(), readAs) }
+}
+
+const DIALECT_LABELS: Record<DialectId, string> = {
+  postgres: 'PostgreSQL',
+  oracle: 'Oracle',
 }
 
 /** How long the text must rest before it is parsed again. */
@@ -37,6 +47,7 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       state.schema.tables.length > 0 || (state.schema.types ?? []).length > 0
   )
   const dialect = useForgeStore((state) => state.dialect)
+  const [readAs, setReadAs] = useState<DialectId>(dialect)
   const [text, setText] = useState('')
   const [parsed, setParsed] = useState<Parsed | null>(null)
   // The preview lags the text by the debounce; Import waits for it to catch up.
@@ -44,8 +55,8 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<Mode>('add')
   const [fileError, setFileError] = useState<string | null>(null)
   const [later] = useState(() =>
-    debounce(PARSE_DELAY_MS, (value: string) => {
-      setParsed(parse(value))
+    debounce(PARSE_DELAY_MS, (value: ToParse) => {
+      setParsed(parse(value.text, value.readAs))
       setPending(false)
     })
   )
@@ -65,11 +76,18 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
     if (immediate) {
       later.cancel()
       setPending(false)
-      setParsed(parse(next))
+      setParsed(parse(next, readAs))
       return
     }
     setPending(true)
-    later.run(next)
+    later.run({ text: next, readAs })
+  }
+
+  function chooseReadAs(next: DialectId) {
+    setReadAs(next)
+    later.cancel()
+    setPending(false)
+    if (!fileError) setParsed(parse(text, next))
   }
 
   async function loadFile(file: File | undefined) {
@@ -124,16 +142,10 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
       onClose={onClose}>
       <h2 className='import-dialog__title'>Import SQL</h2>
       <p className='inspector__hint'>
-        Paste a PostgreSQL script or load a .sql file. Tables, columns, primary
-        and foreign keys, indexes, comments, enums and domains are imported;
-        anything else is listed below and skipped.
+        Paste a script or load a .sql file. Tables, columns, primary and foreign
+        keys, indexes, comments, enums and domains are imported; anything else
+        is listed below and skipped.
       </p>
-
-      {dialect !== 'postgres' && (
-        <p className='inspector__hint'>
-          Scripts are read as PostgreSQL, whatever dialect the project uses.
-        </p>
-      )}
 
       <label className='field'>
         SQL
@@ -147,6 +159,23 @@ export function ImportDialog({ onClose }: { onClose: () => void }) {
           onChange={(event) => edit(event.target.value, false)}
         />
       </label>
+      <label className='field'>
+        Read as
+        <select
+          aria-label='Read as'
+          value={readAs}
+          onChange={(event) => chooseReadAs(event.target.value as DialectId)}>
+          {DIALECT_IDS.map((id) => (
+            <option key={id} value={id}>
+              {DIALECT_LABELS[id]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className='inspector__hint'>
+        Scripts are read as {DIALECT_LABELS[readAs]}.
+      </p>
+
       <label className='field'>
         Or a file
         <input

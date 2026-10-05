@@ -35,6 +35,7 @@ export function defaultColumnType(kind: ColumnKind): ColumnType {
 const KIND_LABELS: Partial<Record<ColumnKind, string>> = {
   timestamp_no_tz: 'timestamp (no tz)',
   double: 'double precision',
+  number: 'number (any precision)',
 }
 
 export const kindLabel = (kind: ColumnKind): string => KIND_LABELS[kind] ?? kind
@@ -54,6 +55,10 @@ export function formatColumnType(
       return `${formatColumnType(type.of, userTypeName)}[]`
     case 'user':
       return userTypeName(type.typeId)
+    case 'native':
+      return type.text
+    case 'number':
+      return 'number'
     default:
       return kindLabel(type.kind)
   }

@@ -48,6 +48,10 @@ test.describe('the Oracle dialect', () => {
     await page.getByRole('button', { name: 'Import SQL' }).click()
     await page
       .getByRole('dialog')
+      .getByLabel('Read as')
+      .selectOption('postgres')
+    await page
+      .getByRole('dialog')
       .getByLabel('SQL', { exact: true })
       .fill(
         "CREATE TABLE t (id int PRIMARY KEY, tags text[], created timestamptz DEFAULT lower('x'), ok boolean DEFAULT true);"
@@ -149,19 +153,19 @@ test.describe('the Oracle dialect', () => {
     await expect(page.getByLabel('Dialect')).toHaveValue('oracle')
   })
 
-  test('the import dialog says scripts are read as PostgreSQL', async ({
+  test('the import dialog reads scripts as the project dialect', async ({
     page,
   }) => {
     await exampleInOracle(page)
     await page.getByRole('button', { name: 'Import SQL' }).click()
     await expect(page.getByRole('dialog')).toContainText(
-      'Scripts are read as PostgreSQL'
+      'Scripts are read as Oracle.'
     )
     await page.keyboard.press('Escape')
     await page.getByLabel('Dialect').selectOption('postgres')
     await page.getByRole('button', { name: 'Import SQL' }).click()
-    await expect(page.getByRole('dialog')).not.toContainText(
-      'Scripts are read as PostgreSQL'
+    await expect(page.getByRole('dialog')).toContainText(
+      'Scripts are read as PostgreSQL.'
     )
   })
 
