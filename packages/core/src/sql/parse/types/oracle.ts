@@ -48,11 +48,14 @@ function readLength(cursor: Cursor, what: string): number {
   return length
 }
 
-/** NUMBER(p) and NUMBER(p,0): the smallest whole-number type that holds p digits. */
+/**
+ * NUMBER(p) and NUMBER(p,0): the smallest whole-number type that holds p digits.
+ * NUMBER(19) is a bigint, as that is what the writer gives one.
+ */
 function whole(precision: number): RawType {
   if (precision <= 4) return { kind: 'smallint' }
   if (precision <= 9) return { kind: 'integer' }
-  if (precision <= 18) return { kind: 'bigint' }
+  if (precision <= 19) return { kind: 'bigint' }
   return { kind: 'numeric', precision, scale: 0 }
 }
 

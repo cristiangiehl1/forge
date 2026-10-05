@@ -217,6 +217,11 @@ export function buildSchema(
     const hintsByColumn = new Map(
       rawTable.hints.map((found) => [found.column, found.hint])
     )
+    for (const alter of raw.alters) {
+      if ('hint' in alter && alter.table === rawTable.name) {
+        hintsByColumn.set(alter.hint.column, alter.hint.hint)
+      }
+    }
     const columnIds = new Map<string, string>()
     const columnMap = new Map<string, Column>()
     for (const column of rawTable.columns) {
@@ -227,10 +232,20 @@ export function buildSchema(
         )
         continue
       }
-      const type = applyHint(
+      let type = applyHint(
         resolveType(column.type, rawTable.origin),
         column.hint ?? hintsByColumn.get(column.name)
       )
+      // An Oracle identity on a wide NUMBER(p,0) is still an identity: keep it
+      // as a number, the type that can be generated.
+      if (
+        dialect === 'oracle' &&
+        type.kind === 'numeric' &&
+        type.scale === 0 &&
+        (column.generated || identities.has(`${rawTable.name}.${column.name}`))
+      ) {
+        type = { kind: 'number' }
+      }
       const { generated, default: fallback } = interpret(
         rawTable.name,
         column,

@@ -98,6 +98,8 @@ export type RawAlter = { origin: Origin; table: string } & (
   | { setDefault: { column: string; expression: string } }
   /** `ALTER COLUMN c ADD GENERATED … AS IDENTITY`. */
   | { identity: string }
+  /** `ADD CONSTRAINT … CHECK (c IN (0,1))` or `IS JSON`: what a column really is. */
+  | { hint: { column: string; hint: RawHint } }
 )
 
 export interface RawScript {

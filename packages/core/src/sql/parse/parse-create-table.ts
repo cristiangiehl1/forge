@@ -323,7 +323,12 @@ export function readCheckHint(
   if (token?.kind === 'word' || token?.kind === 'ident') {
     const column = cursor.identifier('a column name')
     if (cursor.acceptWords('is', 'json')) {
-      while (!cursor.done && !cursor.isSymbol(')')) cursor.next()
+      let depth = 0
+      while (!cursor.done && !(depth === 0 && cursor.isSymbol(')'))) {
+        if (cursor.isSymbol('(')) depth++
+        else if (cursor.isSymbol(')')) depth--
+        cursor.next()
+      }
       if (cursor.acceptSymbol(')')) return { column, hint: 'json' }
     } else if (cursor.acceptWord('in') && cursor.acceptSymbol('(')) {
       const first = cursor.next()

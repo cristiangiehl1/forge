@@ -80,6 +80,8 @@ interface Resolved {
 
 const NOW =
   /^(now\(\)|current_timestamp|transaction_timestamp\(\)|statement_timestamp\(\)|clock_timestamp\(\))$/i
+const ORACLE_FUNCTION =
+  /^(systimestamp|sysdate|localtimestamp|current_timestamp|current_date|sys_guid\(\))$/i
 const PLAIN_LITERAL = /^(-?\d+(\.\d+)?|'(?:[^']|'')*'|null)$/i
 
 /**
@@ -100,7 +102,10 @@ function translateDefault(
   if (kind === 'timestamp_no_tz' && NOW.test(trimmed)) {
     return { sql: 'LOCALTIMESTAMP', note: false }
   }
-  return { sql: text, note: !PLAIN_LITERAL.test(trimmed) }
+  return {
+    sql: text,
+    note: !PLAIN_LITERAL.test(trimmed) && !ORACLE_FUNCTION.test(trimmed),
+  }
 }
 
 function resolveType(

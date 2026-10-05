@@ -4,6 +4,7 @@ import {
   parseColumnList,
   parseExpression,
   parseReference,
+  readCheckHint,
   skipElement,
 } from './parse-create-table.ts'
 import { parseColumnType } from './parse-type.ts'
@@ -69,8 +70,13 @@ export function parseAlterTable(
           foreignKey: { columns, reference: parseReference(cursor) },
         })
       } else if (cursor.acceptWord('check')) {
-        cursor.skipBalanced()
-        cursor.warn('A CHECK constraint is not modelled and was ignored.')
+        const hint = cursor.dialect === 'oracle' ? readCheckHint(cursor) : null
+        if (hint === null) {
+          if (cursor.dialect !== 'oracle') cursor.skipBalanced()
+          cursor.warn('A CHECK constraint is not modelled and was ignored.')
+        } else {
+          raw.alters.push({ origin, table, hint })
+        }
         skipAction(cursor)
       } else {
         cursor.warn(
