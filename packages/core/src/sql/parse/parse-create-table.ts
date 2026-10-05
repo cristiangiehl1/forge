@@ -1,6 +1,12 @@
 import type { Cursor } from './cursor.ts'
 import { parseColumnType } from './parse-type.ts'
-import type { Origin, RawColumn, RawReference, RawTable } from './raw.ts'
+import type {
+  Origin,
+  RawColumn,
+  RawHint,
+  RawReference,
+  RawTable,
+} from './raw.ts'
 import type { Token } from './tokenize.ts'
 
 /** Words that end a DEFAULT expression written without parentheses. */
@@ -13,7 +19,21 @@ const EXPRESSION_STOPS = new Set([
   'check',
   'generated',
   'collate',
+  'enable',
+  'disable',
+  'validate',
+  'novalidate',
+  'using',
 ])
+
+const CONSTRAINT_STATES = [
+  'enable',
+  'disable',
+  'validate',
+  'novalidate',
+  'rely',
+  'norely',
+]
 
 /** `(a, b)` as a list of names. */
 export function parseColumnList(cursor: Cursor): string[] {
@@ -87,6 +107,11 @@ export function parseReference(cursor: Cursor): RawReference {
         if (cursor.isSymbol('(')) cursor.skipBalanced()
       }
       actions = true
+    } else if (
+      cursor.dialect === 'oracle' &&
+      cursor.isWord(...CONSTRAINT_STATES)
+    ) {
+      cursor.next()
     } else if (cursor.isWord('deferrable', 'initially')) {
       const word = cursor.next()
       if (word.value === 'initially') cursor.next()
@@ -107,6 +132,7 @@ export function parseReference(cursor: Cursor): RawReference {
 function parseGenerated(cursor: Cursor, column: RawColumn): void {
   if (!cursor.acceptWord('always')) cursor.expectWord('by')
   if (cursor.isWord('default')) cursor.next()
+  cursor.acceptWords('on', 'null')
   cursor.expectWord('as')
   if (cursor.acceptWord('identity')) {
     column.generated = true
@@ -140,6 +166,7 @@ function parseColumn(cursor: Cursor, table: RawTable): void {
     } else if (cursor.acceptWord('null')) {
       column.notNull = false
     } else if (cursor.acceptWord('default')) {
+      cursor.acceptWords('on', 'null')
       column.default = parseExpression(cursor, 'DEFAULT')
     } else if (cursor.acceptWords('primary', 'key')) {
       column.primaryKey = true
@@ -148,8 +175,25 @@ function parseColumn(cursor: Cursor, table: RawTable): void {
     } else if (cursor.acceptWord('references')) {
       column.reference = parseReference(cursor)
     } else if (cursor.acceptWord('check')) {
-      cursor.skipBalanced()
-      cursor.warn('A CHECK constraint is not modelled and was ignored.')
+      const hint = cursor.dialect === 'oracle' ? readCheckHint(cursor) : null
+      if (hint === null) {
+        if (cursor.dialect !== 'oracle') cursor.skipBalanced()
+        cursor.warn('A CHECK constraint is not modelled and was ignored.')
+      } else if (hint.column === name) {
+        column.hint = hint.hint
+      } else {
+        table.hints.push(hint)
+      }
+    } else if (
+      cursor.dialect === 'oracle' &&
+      cursor.isWord(...CONSTRAINT_STATES)
+    ) {
+      cursor.next()
+    } else if (
+      cursor.dialect === 'oracle' &&
+      cursor.acceptWords('using', 'index')
+    ) {
+      skipElement(cursor)
     } else if (cursor.acceptWord('generated')) {
       parseGenerated(cursor, column)
     } else if (cursor.acceptWord('collate')) {
@@ -180,8 +224,13 @@ function parseTableConstraint(cursor: Cursor, table: RawTable): void {
     cursor.expectWord('references')
     table.foreignKeys.push({ columns, reference: parseReference(cursor) })
   } else if (cursor.acceptWord('check')) {
-    cursor.skipBalanced()
-    cursor.warn('A CHECK constraint is not modelled and was ignored.')
+    const hint = cursor.dialect === 'oracle' ? readCheckHint(cursor) : null
+    if (hint === null) {
+      if (cursor.dialect !== 'oracle') cursor.skipBalanced()
+      cursor.warn('A CHECK constraint is not modelled and was ignored.')
+    } else {
+      table.hints.push(hint)
+    }
     skipElement(cursor)
   } else if (cursor.acceptWord('exclude')) {
     cursor.warn('An EXCLUDE constraint is not modelled and was ignored.')
@@ -225,6 +274,7 @@ export function parseCreateTable(
     primaryKey: [],
     uniques: [],
     foreignKeys: [],
+    hints: [],
   }
   if (!cursor.acceptSymbol(')')) {
     do {
@@ -246,10 +296,47 @@ export function parseCreateTable(
     } while (cursor.acceptSymbol(','))
     cursor.expectSymbol(')')
   }
+  if (cursor.dialect === 'oracle' && !cursor.done) {
+    cursor.warn(
+      `The physical clauses of "${name}" (tablespace, storage, ...) are not modelled and were ignored.`
+    )
+  }
   if (cursor.isWord('inherits', 'partition')) {
     cursor.warn(
       `Inheritance and partitioning of "${name}" are not modelled; it is imported as a plain table.`
     )
   }
   return table
+}
+
+/**
+ * After `CHECK`, at `(`: reads `col IN (0,1)` as a boolean hint and
+ * `col IS JSON [...]` as a json hint, leaving the position after the `)`.
+ * Anything else is skipped whole and gives null.
+ */
+export function readCheckHint(
+  cursor: Cursor
+): { column: string; hint: RawHint } | null {
+  const start = cursor.pos
+  cursor.expectSymbol('(')
+  const token = cursor.peek()
+  if (token?.kind === 'word' || token?.kind === 'ident') {
+    const column = cursor.identifier('a column name')
+    if (cursor.acceptWords('is', 'json')) {
+      while (!cursor.done && !cursor.isSymbol(')')) cursor.next()
+      if (cursor.acceptSymbol(')')) return { column, hint: 'json' }
+    } else if (cursor.acceptWord('in') && cursor.acceptSymbol('(')) {
+      const first = cursor.next()
+      if (cursor.acceptSymbol(',')) {
+        const second = cursor.next()
+        const zeroOne = [first.value, second.value].sort().join(',') === '0,1'
+        if (zeroOne && cursor.acceptSymbol(')') && cursor.acceptSymbol(')')) {
+          return { column, hint: 'boolean' }
+        }
+      }
+    }
+  }
+  cursor.pos = start
+  cursor.skipBalanced()
+  return null
 }

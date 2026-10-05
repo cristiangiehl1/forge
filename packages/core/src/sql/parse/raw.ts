@@ -20,6 +20,8 @@ export interface RawReference {
   actions: boolean
 }
 
+export type RawHint = 'boolean' | 'json'
+
 export interface RawColumn {
   name: string
   type: RawType
@@ -30,6 +32,8 @@ export interface RawColumn {
   generated: boolean
   default?: string
   reference?: RawReference
+  /** A CHECK that says what the column really is. */
+  hint?: RawHint
 }
 
 export interface RawForeignKey {
@@ -49,6 +53,8 @@ export interface RawTable {
   primaryKey: string[]
   uniques: RawUnique[]
   foreignKeys: RawForeignKey[]
+  /** Table-level CHECKs that say what a column really is. */
+  hints: { column: string; hint: RawHint }[]
 }
 
 export interface RawIndex {

@@ -1,3 +1,4 @@
+import type { DialectId } from '../../dialects/dialect.ts'
 import type { Token } from './tokenize.ts'
 
 /** A statement that cannot be read: it becomes an error with its line. */
@@ -15,14 +16,18 @@ export class Cursor {
   pos = 0
 
   readonly tokens: Token[]
+  /** The database the script is written for: it decides how a plain name is folded. */
+  readonly dialect: DialectId
   private readonly sql: string
   private readonly onWarn: (line: number, message: string) => void
 
   constructor(
     tokens: Token[],
     sql: string,
-    onWarn: (line: number, message: string) => void
+    onWarn: (line: number, message: string) => void,
+    dialect: DialectId = 'postgres'
   ) {
+    this.dialect = dialect
     this.tokens = tokens
     this.sql = sql
     this.onWarn = onWarn
@@ -104,12 +109,14 @@ export class Cursor {
     return token ? `, found "${token.text}"` : ' at the end of the statement'
   }
 
-  /** A name: a bare word (folded to lower case) or a quoted identifier. */
+  /** A name: a bare word (folded as the dialect folds it) or a quoted identifier. */
   identifier(what: string): string {
     const token = this.peek()
     if (token?.kind === 'word' || token?.kind === 'ident') {
       this.pos++
-      return token.value
+      return token.kind === 'word' && this.dialect === 'oracle'
+        ? token.text.toUpperCase()
+        : token.value
     }
     return this.fail(`Expected ${what}${this.found()}.`)
   }

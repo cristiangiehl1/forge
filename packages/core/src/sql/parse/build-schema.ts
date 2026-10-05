@@ -1,3 +1,4 @@
+import type { DialectId } from '../../dialects/dialect.ts'
 import type {
   Column,
   ColumnType,
@@ -12,6 +13,7 @@ import { checkRelationship } from '../../schema/validate.ts'
 import type {
   Origin,
   RawColumn,
+  RawHint,
   RawReference,
   RawScript,
   RawTable,
@@ -24,6 +26,22 @@ const NOW_DEFAULT =
   /^(now\(\)|current_timestamp(\(\d*\))?|transaction_timestamp\(\)|statement_timestamp\(\)|clock_timestamp\(\))(::(timestamptz|timestamp with(out)? time zone|timestamp))?$/
 const UUID_DEFAULT = /^(public\.)?(gen_random_uuid|uuid_generate_v4)\(\)$/
 const SEQUENCE_DEFAULT = /^nextval\(/
+const ORACLE_NOW_DEFAULT = /^(systimestamp|current_timestamp(\(\d*\))?)$/
+const ORACLE_UUID_DEFAULT = /^sys_guid\(\)$/
+
+/** A CHECK that says what a column is changes its type: 0/1 is a boolean, IS JSON a json. */
+function applyHint(type: ColumnType, hint: RawHint | undefined): ColumnType {
+  if (
+    hint === 'boolean' &&
+    ['smallint', 'integer', 'bigint', 'number', 'numeric'].includes(type.kind)
+  ) {
+    return { kind: 'boolean' }
+  }
+  if (hint === 'json' && ['text', 'varchar', 'native'].includes(type.kind)) {
+    return { kind: 'json' }
+  }
+  return type
+}
 
 interface BuiltTable {
   id: string
@@ -46,7 +64,8 @@ const sameIds = (a: string[], b: string[]) =>
 export function buildSchema(
   raw: RawScript,
   newId: () => string,
-  warn: BuildWarn
+  warn: BuildWarn,
+  dialect: DialectId = 'postgres'
 ): Schema {
   // The schema is assembled in place. The model's operations copy every table
   // on each call, which is quadratic for a script with thousands of tables.
@@ -75,8 +94,7 @@ export function buildSchema(
     if (type.kind === 'named') {
       const typeId = typeIds.get(type.name)
       if (typeId !== undefined) return { kind: 'user', typeId }
-      warn(origin, `Unknown type "${type.name}" is imported as text.`)
-      return { kind: 'text' }
+      return { kind: 'native', dialect, text: type.name }
     }
     if (type.kind === 'array') {
       const element = resolveType(type.of, origin)
@@ -152,6 +170,15 @@ export function buildSchema(
       return { generated: true }
     if (type.kind === 'uuid' && UUID_DEFAULT.test(lower))
       return { generated: true }
+    if (dialect === 'oracle') {
+      if (type.kind === 'timestamp' && ORACLE_NOW_DEFAULT.test(lower))
+        return { generated: true }
+      if (type.kind === 'uuid' && ORACLE_UUID_DEFAULT.test(lower))
+        return { generated: true }
+      // A boolean here is NUMBER(1): its 1 and 0 are true and false.
+      if (type.kind === 'boolean' && (text === '1' || text === '0'))
+        return { generated: false, default: text === '1' ? 'true' : 'false' }
+    }
     return { generated: false, default: text }
   }
 
@@ -187,6 +214,9 @@ export function buildSchema(
           ? rawTable.primaryKey
           : rawTable.columns.filter((c) => c.primaryKey).map((c) => c.name)
 
+    const hintsByColumn = new Map(
+      rawTable.hints.map((found) => [found.column, found.hint])
+    )
     const columnIds = new Map<string, string>()
     const columnMap = new Map<string, Column>()
     for (const column of rawTable.columns) {
@@ -197,7 +227,10 @@ export function buildSchema(
         )
         continue
       }
-      const type = resolveType(column.type, rawTable.origin)
+      const type = applyHint(
+        resolveType(column.type, rawTable.origin),
+        column.hint ?? hintsByColumn.get(column.name)
+      )
       const { generated, default: fallback } = interpret(
         rawTable.name,
         column,
@@ -205,7 +238,10 @@ export function buildSchema(
         rawTable.origin
       )
       const identityIsRequired =
-        generated && (type.kind === 'integer' || type.kind === 'bigint')
+        generated &&
+        (type.kind === 'integer' ||
+          type.kind === 'bigint' ||
+          type.kind === 'number')
       const id = newId()
       columnIds.set(column.name, id)
       const added: Column = {

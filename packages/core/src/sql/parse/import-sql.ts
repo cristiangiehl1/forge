@@ -1,3 +1,4 @@
+import type { DialectId } from '../../dialects/dialect.ts'
 import type { Schema } from '../../schema/types.ts'
 import { validate } from '../../schema/validate.ts'
 import { buildSchema } from './build-schema.ts'
@@ -21,11 +22,15 @@ export interface ImportResult {
 }
 
 /**
- * Reads a PostgreSQL script into a schema. What Forge does not model is a
+ * Reads a script written for `dialect` into a schema. What Forge does not model is a
  * warning; a statement it should understand but cannot is an error, and the
  * statements around it are still imported.
  */
-export function importSql(sql: string, newId: () => string): ImportResult {
+export function importSql(
+  sql: string,
+  newId: () => string,
+  dialect: DialectId = 'postgres'
+): ImportResult {
   const warnings: ImportMessage[] = []
   const errors: ImportMessage[] = []
   const seen = new Set<string>()
@@ -43,7 +48,7 @@ export function importSql(sql: string, newId: () => string): ImportResult {
     warnings.push(message)
   }
 
-  const { tokens, errors: lexical } = tokenize(sql)
+  const { tokens, errors: lexical } = tokenize(sql, dialect)
   for (const error of lexical) {
     addError({ line: error.line, statement: '', message: error.message })
   }
@@ -69,7 +74,8 @@ export function importSql(sql: string, newId: () => string): ImportResult {
         (line, message) => {
           if (!isStump) addWarning({ line, statement: preview, message })
         },
-        preview
+        preview,
+        dialect
       )
     } catch (error) {
       if (isStump && error instanceof ParseFailure) continue
@@ -82,9 +88,14 @@ export function importSql(sql: string, newId: () => string): ImportResult {
     }
   }
 
-  const schema = buildSchema(raw, newId, (origin, message) => {
-    addWarning({ line: origin.line, statement: origin.text, message })
-  })
+  const schema = buildSchema(
+    raw,
+    newId,
+    (origin, message) => {
+      addWarning({ line: origin.line, statement: origin.text, message })
+    },
+    dialect
+  )
   for (const issue of validate(schema)) {
     addError({ line: 0, statement: '', message: issue.message })
   }

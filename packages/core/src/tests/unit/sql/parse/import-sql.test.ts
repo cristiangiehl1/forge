@@ -186,12 +186,14 @@ describe('importSql: types', () => {
     })
   })
 
-  it('imports an unknown type as text, with a warning', () => {
+  it('keeps an unknown type as a native type, with no warning', () => {
     const result = run(sql)
     assert.deepEqual(result.schema.tables[0]?.columns[3]?.type, {
-      kind: 'text',
+      kind: 'native',
+      dialect: 'postgres',
+      text: 'sad_mood',
     })
-    assert.ok(messages(result.warnings).some((m) => m.includes('sad_mood')))
+    assert.ok(!messages(result.warnings).some((m) => m.includes('sad_mood')))
   })
 
   it('keeps the first of two types with the same name', () => {

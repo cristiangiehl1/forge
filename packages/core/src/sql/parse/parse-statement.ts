@@ -1,3 +1,4 @@
+import type { DialectId } from '../../dialects/dialect.ts'
 import { Cursor } from './cursor.ts'
 import { parseCreateTable } from './parse-create-table.ts'
 import {
@@ -50,9 +51,10 @@ export function parseStatement(
   sql: string,
   raw: RawScript,
   warn: Warn,
-  preview: string = previewOf(statement.text)
+  preview: string = previewOf(statement.text),
+  dialect: DialectId = 'postgres'
 ): void {
-  const cursor = new Cursor(statement.tokens, sql, warn)
+  const cursor = new Cursor(statement.tokens, sql, warn, dialect)
   const origin: Origin = { line: statement.line, text: preview }
 
   if (cursor.acceptWord('create')) {

@@ -1,3 +1,5 @@
+import type { DialectId } from '../../dialects/dialect.ts'
+
 export type TokenKind = 'word' | 'ident' | 'string' | 'number' | 'symbol'
 
 export interface Token {
@@ -40,7 +42,10 @@ const ESCAPES: Record<string, string> = {
   f: '\f',
 }
 
-export function tokenize(sql: string): { tokens: Token[]; errors: LexError[] } {
+export function tokenize(
+  sql: string,
+  dialect: DialectId = 'postgres'
+): { tokens: Token[]; errors: LexError[] } {
   const tokens: Token[] = []
   const errors: LexError[] = []
   const length = sql.length
@@ -95,6 +100,16 @@ export function tokenize(sql: string): { tokens: Token[]; errors: LexError[] } {
       const end = sql.indexOf('\n', i)
       i = end === -1 ? length : end
       continue
+    }
+    // In Oracle a line that is only "/" ends a PL/SQL block or a statement.
+    if (dialect === 'oracle' && c === '/') {
+      const from = sql.lastIndexOf('\n', i - 1) + 1
+      const found = sql.indexOf('\n', i)
+      const until = found === -1 ? length : found
+      if (sql.slice(from, until).trim() === '/') {
+        i = until
+        continue
+      }
     }
     if (c === '-' && sql[i + 1] === '-') {
       const end = sql.indexOf('\n', i)

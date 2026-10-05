@@ -90,7 +90,7 @@ describe('parseColumnType: sized types', () => {
     assert.deepEqual(typeOf('character varying').type, { kind: 'text' })
   })
 
-  it('reads numeric and decimal, with defaults and a warning when unconstrained', () => {
+  it('reads numeric and decimal, with defaults, and number when unconstrained', () => {
     assert.deepEqual(typeOf('numeric(10,2)').type, {
       kind: 'numeric',
       precision: 10,
@@ -102,8 +102,8 @@ describe('parseColumnType: sized types', () => {
       scale: 0,
     })
     const bare = typeOf('numeric')
-    assert.deepEqual(bare.type, { kind: 'numeric', precision: 38, scale: 10 })
-    assert.equal(bare.warnings.length, 1)
+    assert.deepEqual(bare.type, { kind: 'number' })
+    assert.equal(bare.warnings.length, 0)
   })
 
   it('stops after the type, leaving the rest', () => {
