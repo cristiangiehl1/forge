@@ -9,7 +9,10 @@ type CopyState = 'idle' | 'copied' | 'failed'
 export function DdlPanel() {
   const schema = useForgeStore((state) => state.schema)
   const [copyState, setCopyState] = useState<CopyState>('idle')
-  const hoveredTable = useForgeStore((state) => state.hoveredTable)
+  // The table under the pointer, or else the selected one, is highlighted.
+  const hoveredTable = useForgeStore(
+    (state) => state.hoveredTable ?? state.selection
+  )
   const dialect = useForgeStore((state) => state.dialect)
   const dialectOptions = useForgeStore((state) => state.dialectOptions)
   const activeRef = useRef<HTMLSpanElement | null>(null)

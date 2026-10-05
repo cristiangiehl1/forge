@@ -32,13 +32,18 @@ export function TableNode({ id, data }: NodeProps<TableFlowNode>) {
     state.schema.tables.find((candidate) => candidate.id === data.tableId)
   )
   const userTypes = useForgeStore((state) => state.schema.types)
-  const hovered = useForgeStore((state) => state.hoveredTable === data.tableId)
-  const relatedToHovered = useForgeStore(
-    (state) =>
-      state.hoveredTable !== null &&
-      state.hoveredTable !== data.tableId &&
-      relatedTables(state.schema, state.hoveredTable).has(data.tableId)
+  // The table under the pointer, or else the selected one, is the focus.
+  const hovered = useForgeStore(
+    (state) => (state.hoveredTable ?? state.selection) === data.tableId
   )
+  const relatedToHovered = useForgeStore((state) => {
+    const focus = state.hoveredTable ?? state.selection
+    return (
+      focus !== null &&
+      focus !== data.tableId &&
+      relatedTables(state.schema, focus).has(data.tableId)
+    )
+  })
   const updateNodeInternals = useUpdateNodeInternals()
 
   // React Flow measures handle positions once; adding, removing or reordering

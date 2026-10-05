@@ -85,7 +85,12 @@ export function Canvas() {
   // hover and selection just restyle the edges that come out of it.
   const routes = routeRelationships(schema, resolvePositions(schema, view))
   const edges = stableEdges(
-    toFlowEdges(schema, routes, relationshipSelection, hoveredTable)
+    toFlowEdges(
+      schema,
+      routes,
+      relationshipSelection,
+      hoveredTable ?? selection
+    )
   )
 
   function isValidConnection(connection: Connection | Edge) {
