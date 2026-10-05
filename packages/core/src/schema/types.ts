@@ -1,3 +1,5 @@
+import type { DialectId } from '../dialects/dialect.ts'
+
 export type TableId = string
 export type ColumnId = string
 export type RelationshipId = string
@@ -8,6 +10,7 @@ export const SIMPLE_COLUMN_KINDS = [
   'integer',
   'bigint',
   'smallint',
+  'number',
   'text',
   'boolean',
   'uuid',
@@ -36,11 +39,14 @@ export type ColumnType =
   | { kind: 'numeric'; precision: number; scale: number }
   | { kind: 'array'; of: ColumnType }
   | { kind: 'user'; typeId: TypeId }
+  /** A type the model has no logical kind for, kept as its database writes it. */
+  | { kind: 'native'; dialect: DialectId; text: string }
 
 /** The kinds a database can generate a value for: identity or a default (a timestamp defaults to now()). */
 export const GENERATED_COLUMN_KINDS = [
   'integer',
   'bigint',
+  'number',
   'uuid',
   'timestamp',
 ] as const

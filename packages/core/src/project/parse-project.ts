@@ -135,6 +135,24 @@ function parseType(
     }
     return { kind: 'user', typeId: raw.typeId }
   }
+  if (kind === 'native') {
+    const { dialect, text } = raw
+    if (
+      typeof dialect !== 'string' ||
+      !(DIALECT_IDS as readonly string[]).includes(dialect)
+    ) {
+      fail(
+        `${path}.dialect`,
+        `A native type needs a "dialect" of ${DIALECT_IDS.join(', ')}.`
+      )
+      return undefined
+    }
+    if (typeof text !== 'string' || text.trim() === '') {
+      fail(`${path}.text`, 'A native type needs a "text".')
+      return undefined
+    }
+    return { kind: 'native', dialect: dialect as DialectId, text }
+  }
   fail(path, `Unknown column type "${kind}".`)
   return undefined
 }

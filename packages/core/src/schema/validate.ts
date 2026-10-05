@@ -33,6 +33,7 @@ export type IssueCode =
   | 'enum-empty-value'
   | 'enum-duplicate-value'
   | 'unknown-type'
+  | 'empty-native-type'
   | 'type-cycle'
   | 'name-collision'
   | 'dialect-name-too-long'
@@ -58,6 +59,11 @@ type IssueIds = Pick<
   Issue,
   'tableId' | 'columnId' | 'relationshipId' | 'indexId' | 'typeId'
 >
+
+function hasBlankNative(type: ColumnType): boolean {
+  if (type.kind === 'array') return hasBlankNative(type.of)
+  return type.kind === 'native' && type.text.trim() === ''
+}
 
 function issue(code: IssueCode, message: string, ids: IssueIds = {}): Issue {
   const result: Issue = { code, message }
@@ -238,6 +244,15 @@ export function validate(schema: Schema): Issue[] {
           )
         )
       }
+      if (hasBlankNative(column.type)) {
+        issues.push(
+          issue(
+            'empty-native-type',
+            `Column "${table.name}.${column.name}" has a native type with no text.`,
+            ids
+          )
+        )
+      }
       if (userTypeIdsOf(column.type).some((id) => !typeIds.has(id))) {
         issues.push(
           issue(
@@ -407,6 +422,14 @@ export function validate(schema: Schema): Issue[] {
         issue(
           'type-cycle',
           `Domain "${userType.name}" is based on itself, directly or through other domains.`,
+          ids
+        )
+      )
+    } else if (hasBlankNative(userType.base)) {
+      issues.push(
+        issue(
+          'empty-native-type',
+          `Domain "${userType.name}" has a native base type with no text.`,
           ids
         )
       )

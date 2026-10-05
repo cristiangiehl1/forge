@@ -11,6 +11,12 @@ export function sameTypeShape(a: ColumnType, b: ColumnType): boolean {
     return sameTypeShape(a.of, b.of)
   }
   if (a.kind === 'user' && b.kind === 'user') return a.typeId === b.typeId
+  if (a.kind === 'native' && b.kind === 'native') {
+    return (
+      a.dialect === b.dialect &&
+      a.text.trim().toLowerCase() === b.text.trim().toLowerCase()
+    )
+  }
   return true
 }
 
