@@ -19,6 +19,7 @@ import * as core from '@forge/core'
 import { createStore } from 'zustand/vanilla'
 
 import type { LoadResult } from '../../queries/project/load-project.ts'
+import { createRecruitmentExample } from '../example/recruitment-example.ts'
 import { createShopExample } from '../example/shop-example.ts'
 import type { History, Snapshot } from '../history/history.ts'
 import { emptyHistory, record, redoStep, undoStep } from '../history/history.ts'
@@ -74,7 +75,7 @@ export interface ForgeState {
   setDialectOptions: (options: DialectOptions) => void
   startNewProject: () => void
   /** Replaces the project with a ready-made example to look at. */
-  loadExample: () => void
+  loadExample: (name?: 'shop' | 'recruitment') => void
   /** Takes back the last step; does nothing when there is none. */
   undo: () => void
   redo: () => void
@@ -309,11 +310,18 @@ export function createForgeStore({ newId, now = Date.now }: ForgeStoreDeps) {
         set({ projectEpoch: get().projectEpoch + 1, history: emptyHistory() })
       },
 
-      loadExample: () => {
-        const { schema, view } = createShopExample()
+      loadExample: (name = 'shop') => {
+        const { schema, view } =
+          name === 'recruitment'
+            ? createRecruitmentExample()
+            : createShopExample()
         editProject({
           schema,
           view,
+          // The recruitment system lives in Oracle: its example says so.
+          ...(name === 'recruitment'
+            ? { dialect: 'oracle' as DialectId, dialectOptions: {} }
+            : {}),
           selection: null,
           relationshipSelection: null,
           hoveredTable: null,

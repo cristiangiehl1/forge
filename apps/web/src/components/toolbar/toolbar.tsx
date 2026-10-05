@@ -128,6 +128,19 @@ export function Toolbar({ ddlOpen, onToggleDdl }: ToolbarProps) {
           Load example
         </button>
       )}
+      {hasTables ? (
+        <ConfirmButton
+          label='Load recruitment example'
+          armedLabel='Replace the project with the recruitment example?'
+          onConfirm={() => forgeStore.getState().loadExample('recruitment')}
+        />
+      ) : (
+        <button
+          type='button'
+          onClick={() => forgeStore.getState().loadExample('recruitment')}>
+          Load recruitment example
+        </button>
+      )}
       <button
         type='button'
         disabled={!hasTables}

@@ -58,6 +58,14 @@ describe('the dialect in the store', () => {
     assert.equal(store.getState().dialect, 'postgres')
   })
 
+  it('is made Oracle by loading the recruitment example', () => {
+    const store = makeStore()
+    assert.equal(store.getState().dialect, 'postgres')
+    store.getState().loadExample('recruitment')
+    assert.equal(store.getState().dialect, 'oracle')
+    assert.ok(store.getState().schema.tables.length > 40)
+  })
+
   it('is not a step of the undo history', () => {
     const store = makeStore()
     store.getState().setDialect('oracle')
